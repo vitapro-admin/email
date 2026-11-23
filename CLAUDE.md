@@ -21,16 +21,16 @@ Mimo rozsahu (zatiaľ): kalendár, kontakty, natívna mobilná appka, šifrovani
 
 ## 3. Záväzné architektonické rozhodnutia
 
-| Oblasť | Rozhodnutie |
-| --- | --- |
-| Jazyk | TypeScript (strict), Node.js LTS |
-| Poštový server | Mailcow (Postfix, Dovecot, Rspamd, SOGo) |
-| Protokol | IMAP a SMTP cez vrstvu `mail-gateway`; nikde v aplikácii sa nesmie volať IMAP priamo mimo nej (aby sa dal neskôr vymeniť za JMAP) |
-| Identita | OIDC (Keycloak alebo Authentik), 2FA alebo passkey; aplikácia nikdy neukladá heslá používateľov |
-| Databáza | Postgres (metadáta, väzby na CRM, šablóny, audit, AI záznam); samotná pošta ostáva na mailservere |
-| Frontend | Webová aplikácia (návrh: React + Vite), responzívna, pripravená na PWA |
-| Dizajn | Tokeny a logo AQUA PRO (Inter, tmavá a svetlá téma), vizuálna referencia: `prototype/` |
-| Nasadenie | Interné servery, Docker Compose |
+| Oblasť         | Rozhodnutie                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Jazyk          | TypeScript (strict), Node.js LTS                                                                                                  |
+| Poštový server | Mailcow (Postfix, Dovecot, Rspamd, SOGo)                                                                                          |
+| Protokol       | IMAP a SMTP cez vrstvu `mail-gateway`; nikde v aplikácii sa nesmie volať IMAP priamo mimo nej (aby sa dal neskôr vymeniť za JMAP) |
+| Identita       | OIDC (Keycloak alebo Authentik), 2FA alebo passkey; aplikácia nikdy neukladá heslá používateľov                                   |
+| Databáza       | Postgres (metadáta, väzby na CRM, šablóny, audit, AI záznam); samotná pošta ostáva na mailservere                                 |
+| Frontend       | Webová aplikácia (návrh: React + Vite), responzívna, pripravená na PWA                                                            |
+| Dizajn         | Tokeny a logo AQUA PRO (Inter, tmavá a svetlá téma), vizuálna referencia: `prototype/`                                            |
+| Nasadenie      | Interné servery, Docker Compose                                                                                                   |
 
 Zmena rozhodnutia v tabuľke = najprv krátky záznam v `docs/decisions/` a súhlas majiteľa projektu.
 

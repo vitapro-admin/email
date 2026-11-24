@@ -259,7 +259,13 @@ async function main() {
       .waitFor({ timeout: 15_000 });
 
     step("odhlásenie");
-    await page.getByRole("button", { name: "Odhlásiť" }).click();
+    await page.getByRole("button", { name: "Prepnúť na tmavú tému" }).click();
+    await screenshot(page, "07-tmava-tema");
+    await page.getByRole("button", { name: "Prepnúť na svetlú tému" }).click();
+    await page.getByRole("button", { name: /^Účet:/ }).click();
+    await page.getByRole("menuitem", { name: "Odhlásiť" }).waitFor();
+    await screenshot(page, "08-menu-pouzivatela");
+    await page.getByRole("menuitem", { name: "Odhlásiť" }).click();
     await page.getByRole("heading", { name: "Prihlásenie do pošty" }).waitFor();
     const afterLogout = await context.request.get(`${BASE}/api/folders`);
     assert.equal(afterLogout.status(), 401);

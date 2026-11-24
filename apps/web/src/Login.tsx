@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { ApiError, api } from "./api";
+import { Logo } from "./Logo";
 import type { Profile } from "./types";
 
 export function Login({ onLoggedIn }: { onLoggedIn: (user: Profile) => void }) {
@@ -25,7 +26,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: (user: Profile) => void }) {
   return (
     <main className="login">
       <form className="login-card" onSubmit={submit}>
-        <img className="login-logo" src="/logo.svg" alt="AQUA PRO" />
+        <Logo className="login-logo" />
         <h1>Prihlásenie do pošty</h1>
         <div className="field stacked">
           <label htmlFor="username">Meno</label>

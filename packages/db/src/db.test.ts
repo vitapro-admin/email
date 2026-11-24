@@ -43,16 +43,24 @@ describe.skipIf(!TEST_DATABASE_URL)("PostgreSQL", () => {
   describe("migrations", () => {
     it("creates the schema and is a no-op the second time", async () => {
       const first = await migrate(db);
-      expect(first.applied).toEqual(["001_crm_mirror"]);
+      expect(first.applied).toEqual(["001_crm_mirror", "002_directory"]);
       const tables = await db.query<{ table_name: string }>(
         "select table_name from information_schema.tables where table_schema = current_schema() order by 1",
       );
       expect(tables.rows.map((t) => t.table_name)).toEqual([
         "app_settings",
+        "audit_log",
+        "branches",
         "crm_records",
         "crm_request_log",
         "crm_sync_runs",
+        "departments",
+        "role_permissions",
+        "roles",
         "schema_migrations",
+        "user_photos",
+        "user_roles",
+        "users",
       ]);
       expect((await migrate(db)).applied).toEqual([]);
     });

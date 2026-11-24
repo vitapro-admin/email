@@ -56,3 +56,14 @@ describe("InMemoryMailGateway", () => {
     expect(await gateway.getMessage("INBOX", 999)).toBeNull();
   });
 });
+
+describe("InMemoryMailGateway: markSeen", () => {
+  it("sets and clears the read flag and reports unknown messages", async () => {
+    const gateway = new InMemoryMailGateway({ INBOX: [message(1)] });
+    expect(await gateway.markSeen("INBOX", 1, true)).toBe(true);
+    expect((await gateway.getMessage("INBOX", 1))?.seen).toBe(true);
+    expect(await gateway.markSeen("INBOX", 1, false)).toBe(true);
+    expect((await gateway.getMessage("INBOX", 1))?.seen).toBe(false);
+    expect(await gateway.markSeen("INBOX", 99, true)).toBe(false);
+  });
+});

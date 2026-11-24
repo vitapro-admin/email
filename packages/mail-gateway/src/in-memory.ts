@@ -1,6 +1,12 @@
 import { simpleParser } from "mailparser";
 import type { MailGateway } from "./gateway.js";
-import type { FolderInfo, ListMessagesOptions, MessageDetail, MessageSummary } from "./types.js";
+import type {
+  AttachmentContent,
+  FolderInfo,
+  ListMessagesOptions,
+  MessageDetail,
+  MessageSummary,
+} from "./types.js";
 
 /** Test double that also defines the behaviour every real gateway must reproduce. */
 export class InMemoryMailGateway implements MailGateway {
@@ -31,6 +37,18 @@ export class InMemoryMailGateway implements MailGateway {
       .slice(0, limit)
       .map(toSummary);
     return Promise.resolve(result);
+  }
+
+  getAttachment(): Promise<AttachmentContent | null> {
+    // The in-memory double stores no attachment bodies.
+    return Promise.resolve(null);
+  }
+
+  markSeen(folder: string, uid: number, seen: boolean): Promise<boolean> {
+    const message = this.folders.get(folder)?.find((m) => m.uid === uid);
+    if (!message) return Promise.resolve(false);
+    message.seen = seen;
+    return Promise.resolve(true);
   }
 
   async appendMessage(

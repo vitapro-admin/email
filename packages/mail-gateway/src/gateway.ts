@@ -1,4 +1,10 @@
-import type { FolderInfo, ListMessagesOptions, MessageDetail, MessageSummary } from "./types.js";
+import type {
+  AttachmentContent,
+  FolderInfo,
+  ListMessagesOptions,
+  MessageDetail,
+  MessageSummary,
+} from "./types.js";
 
 /**
  * Read access to one user's mailbox. Implementations: IMAP (production, later JMAP),
@@ -9,6 +15,10 @@ export interface MailGateway {
   listMessages(folder: string, options?: ListMessagesOptions): Promise<MessageSummary[]>;
   /** Returns null when the message does not exist. */
   getMessage(folder: string, uid: number): Promise<MessageDetail | null>;
+  /** Content of the n-th real attachment (same order as MessageDetail.attachments), or null. */
+  getAttachment(folder: string, uid: number, index: number): Promise<AttachmentContent | null>;
+  /** Sets or clears the "read" flag. Returns false when the message does not exist. */
+  markSeen(folder: string, uid: number, seen: boolean): Promise<boolean>;
   /** Stores a complete message (RFC 822) in a folder, creating the folder if needed. Used for Sent. */
   appendMessage(folder: string, raw: Buffer, flags?: string[]): Promise<{ uid?: number }>;
 }

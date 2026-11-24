@@ -49,3 +49,7 @@ export interface ListMessagesOptions {
   /** Return only messages with uid lower than this (for paging). */
   beforeUid?: number;
 }
+
+export interface AttachmentContent extends AttachmentInfo {
+  content: Buffer;
+}

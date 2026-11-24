@@ -110,6 +110,20 @@ describe.skipIf(!host)("ImapMailGateway (real server)", () => {
     expect(after.find((m) => m.uid === first?.uid)?.seen).toBe(false);
   });
 
+  it("downloads an attachment by its position and marks a message as read", async () => {
+    const messages = await gateway.listMessages("INBOX");
+    const reply = messages.find((m) => m.subject.startsWith("Re:") && m.subject.endsWith(run));
+    const attachment = await gateway.getAttachment("INBOX", reply?.uid ?? 0, 0);
+    expect(attachment?.filename).toBe("list.txt");
+    expect(attachment?.content.toString()).toBe("obsah prílohy");
+    expect(await gateway.getAttachment("INBOX", reply?.uid ?? 0, 5)).toBeNull();
+
+    expect(await gateway.markSeen("INBOX", reply?.uid ?? 0, true)).toBe(true);
+    const after = await gateway.listMessages("INBOX");
+    expect(after.find((m) => m.uid === reply?.uid)?.seen).toBe(true);
+    expect(await gateway.markSeen("INBOX", 999999, true)).toBe(false);
+  });
+
   it("returns null for a missing message or folder", async () => {
     expect(await gateway.getMessage("INBOX", 999999)).toBeNull();
     expect(await gateway.getMessage("Neexistuje", 1)).toBeNull();

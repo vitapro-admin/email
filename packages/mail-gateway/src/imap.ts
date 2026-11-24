@@ -5,6 +5,7 @@ import type { AddressObject, Attachment } from "mailparser";
 import type { MailGateway } from "./gateway.js";
 import type {
   Address,
+  AttachmentContent,
   AttachmentInfo,
   FolderInfo,
   ListMessagesOptions,
@@ -74,6 +75,43 @@ export class ImapMailGateway implements MailGateway {
           summaries.push(toSummary(folder, message));
         }
         return summaries.sort((a, b) => b.uid - a.uid);
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
+  async getAttachment(
+    folder: string,
+    uid: number,
+    index: number,
+  ): Promise<AttachmentContent | null> {
+    return this.withClient(async (client) => {
+      if (!(await folderExists(client, folder))) return null;
+      const lock = await client.getMailboxLock(folder);
+      try {
+        const message = await client.fetchOne(String(uid), { source: true }, { uid: true });
+        if (!message || !message.source) return null;
+        const parsed = await simpleParser(message.source);
+        const attachment = parsed.attachments.filter(isRealAttachment)[index];
+        if (!attachment) return null;
+        return { ...toAttachmentInfo(attachment), content: attachment.content };
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
+  async markSeen(folder: string, uid: number, seen: boolean): Promise<boolean> {
+    return this.withClient(async (client) => {
+      if (!(await folderExists(client, folder))) return false;
+      const lock = await client.getMailboxLock(folder);
+      try {
+        const found = await client.search({ uid: String(uid) }, { uid: true });
+        if (!found || found.length === 0) return false;
+        if (seen) await client.messageFlagsAdd(String(uid), ["\\Seen"], { uid: true });
+        else await client.messageFlagsRemove(String(uid), ["\\Seen"], { uid: true });
+        return true;
       } finally {
         lock.release();
       }

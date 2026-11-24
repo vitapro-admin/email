@@ -48,53 +48,32 @@ function preview(input: RenderInput): string {
 }
 
 function buildMjml(input: RenderInput): string {
-  const card = input.variant === "card";
-  const padX = card ? "0" : "40px";
-  const logoAlign = card ? "center" : "left";
+  const padX = "40px";
 
-  const logo = `<mj-section padding="${card ? "0" : `36px ${padX} 0`}"><mj-column><mj-image src="${escapeHtml(input.logoUrl)}" alt="${escapeHtml(input.company.name)}" width="112px" align="${logoAlign}" padding="0" /></mj-column></mj-section>`;
-  const divider = card
-    ? `<mj-section padding="22px 0 0"><mj-column><mj-divider border-color="${COLORS.line}" border-width="1px" padding="0" /></mj-column></mj-section>`
-    : "";
-  const title = input.title
-    ? `<mj-section padding="${card ? "26px 0 0" : `28px ${padX} 0`}"><mj-column>${text(escapeHtml(input.title), `font-family="${FONT}" font-size="28px" line-height="1.2" font-weight="600" letter-spacing="-0.02em" color="${COLORS.text}"`)}</mj-column></mj-section>`
-    : "";
-  const body = `<mj-section padding="${card ? "24px 0 0" : `${input.title ? "22px" : "28px"} ${padX} 0`}"><mj-column>${text(docToHtml(input.body), `font-family="${FONT}"`)}</mj-column></mj-section>`;
+  // Header row: logo on the left, optional title on the same level, right aligned.
+  const logoImage = `<mj-image src="${escapeHtml(input.logoUrl)}" alt="${escapeHtml(input.company.name)}" width="112px" align="left" padding="0" />`;
+  const header = input.title
+    ? `<mj-section padding="36px ${padX} 0"><mj-group><mj-column width="38%" vertical-align="middle">${logoImage}</mj-column><mj-column width="62%" vertical-align="middle">${text(escapeHtml(input.title), `font-family="${FONT}" align="right" font-size="22px" line-height="1.25" font-weight="600" letter-spacing="-0.01em" color="${COLORS.text}"`)}</mj-column></mj-group></mj-section>`
+    : `<mj-section padding="36px ${padX} 0"><mj-column>${logoImage}</mj-column></mj-section>`;
+
+  const body = `<mj-section padding="30px ${padX} 0"><mj-column>${text(docToHtml(input.body), `font-family="${FONT}"`)}</mj-column></mj-section>`;
 
   const facts = input.facts?.length
-    ? card
-      ? `<mj-section padding="8px 0 0"><mj-column background-color="${COLORS.tint}" border-left="3px solid ${COLORS.accent}" border-radius="4px" padding="8px 16px">${factsRows(input.facts)}</mj-column></mj-section>`
-      : `<mj-section padding="8px ${padX} 0"><mj-column border-top="1px solid ${COLORS.line}" border-bottom="1px solid ${COLORS.line}" padding="8px 0">${factsRows(input.facts)}</mj-column></mj-section>`
+    ? `<mj-section padding="8px ${padX} 0"><mj-column border-top="1px solid ${COLORS.line}" border-bottom="1px solid ${COLORS.line}" padding="8px 0">${factsRows(input.facts)}</mj-column></mj-section>`
     : "";
 
-  const signature = `<mj-section padding="${card ? "24px 0 0" : `26px ${padX} 0`}"><mj-column>${text(signatureHtml(input.sender), `font-family="${FONT}"`)}</mj-column></mj-section>`;
+  const signature = `<mj-section padding="26px ${padX} 0"><mj-column>${text(signatureHtml(input.sender), `font-family="${FONT}"`)}</mj-column></mj-section>`;
   const quote = input.quote
-    ? `<mj-section padding="${card ? "28px 0 0" : `30px ${padX} 0`}"><mj-column>${text(quoteHtml(input), `font-family="${FONT}"`)}</mj-column></mj-section>`
+    ? `<mj-section padding="30px ${padX} 0"><mj-column>${text(quoteHtml(input), `font-family="${FONT}"`)}</mj-column></mj-section>`
     : "";
-  const bottomPad = `<mj-section padding="${card ? "28px 0 0" : "34px 0 0"}"><mj-column><mj-spacer height="1px" /></mj-column></mj-section>`;
+  const footer = `<mj-section padding="34px ${padX} 36px"><mj-column border-top="1px solid ${COLORS.line}" padding="16px 0 0"><mj-text padding="0" font-family="${FONT}" font-size="12px" line-height="1.5" color="${COLORS.muted}">${escapeHtml(input.company.name)}<br>${escapeHtml(input.company.legalLine)}</mj-text></mj-column></mj-section>`;
 
-  const footerText = `<mj-text padding="0" font-family="${FONT}" font-size="12px" line-height="1.5" color="${COLORS.muted}" align="${card ? "center" : "left"}">${escapeHtml(input.company.name)}<br>${escapeHtml(input.company.legalLine)}</mj-text>`;
-
-  const head = `<mj-head>
+  return `<mjml><mj-head>
     <mj-title>${escapeHtml(input.subject)}</mj-title>
     <mj-preview>${escapeHtml(preview(input))}</mj-preview>
     <mj-attributes><mj-all font-family="${FONT}" /></mj-attributes>
     <mj-raw><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></mj-raw>
-  </mj-head>`;
-
-  if (card) {
-    return `<mjml>${head}<mj-body background-color="${COLORS.tint}" width="600px">
-      <mj-section padding="28px 0 0"><mj-column><mj-spacer height="1px" /></mj-column></mj-section>
-      <mj-wrapper background-color="#FFFFFF" border-radius="12px" padding="36px 40px 40px">
-        ${logo}${divider}${title}${body}${facts}${signature}${quote}
-      </mj-wrapper>
-      <mj-section padding="22px 40px 34px"><mj-column>${footerText}</mj-column></mj-section>
-    </mj-body></mjml>`;
-  }
-  return `<mjml>${head}<mj-body background-color="#FFFFFF" width="640px">
-    ${logo}${title}${body}${facts}${signature}${quote}${bottomPad}
-    <mj-section padding="18px ${padX} 36px"><mj-column border-top="1px solid ${COLORS.line}" padding="16px 0 0">${footerText}</mj-column></mj-section>
-  </mj-body></mjml>`;
+  </mj-head><mj-body background-color="#FFFFFF" width="640px">${header}${body}${facts}${signature}${quote}${footer}</mj-body></mjml>`;
 }
 
 function buildText(input: RenderInput): string {

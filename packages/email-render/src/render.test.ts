@@ -1,13 +1,12 @@
 import { paragraph, text, textToDoc } from "@aquapro/editor-schema";
 import { describe, expect, it } from "vitest";
 import { renderEmail } from "./render.js";
-import type { RenderInput, Variant } from "./types.js";
+import type { RenderInput } from "./types.js";
 
 const LOGO = "https://example.test/logo.png";
 
-function input(variant: Variant, overrides: Partial<RenderInput> = {}): RenderInput {
+function input(overrides: Partial<RenderInput> = {}): RenderInput {
   return {
-    variant,
     subject: "Test",
     body: textToDoc("Dobrý deň,\n\nďakujeme za správu."),
     sender: {
@@ -22,9 +21,9 @@ function input(variant: Variant, overrides: Partial<RenderInput> = {}): RenderIn
   };
 }
 
-describe.each<Variant>(["clean", "card"])("renderEmail (%s)", (variant) => {
+describe("renderEmail", () => {
   it("produces HTML with the logo once and a plain-text alternative", async () => {
-    const out = await renderEmail(input(variant));
+    const out = await renderEmail(input());
     expect(out.html.split(LOGO)).toHaveLength(2); // exactly one occurrence
     expect(out.html).toContain("ďakujeme za správu");
     expect(out.text).toContain("ďakujeme za správu");
@@ -33,7 +32,7 @@ describe.each<Variant>(["clean", "card"])("renderEmail (%s)", (variant) => {
 
   it("escapes user content", async () => {
     const out = await renderEmail(
-      input(variant, { body: [paragraph('<script>alert("x")</script> & <img src=x onerror=1>')] }),
+      input({ body: [paragraph('<script>alert("x")</script> & <img src=x onerror=1>')] }),
     );
     expect(out.html).not.toContain("<script>alert");
     expect(out.html).not.toContain("<img src=x");
@@ -42,7 +41,7 @@ describe.each<Variant>(["clean", "card"])("renderEmail (%s)", (variant) => {
 
   it("drops unsafe links but keeps the text", async () => {
     const out = await renderEmail(
-      input(variant, {
+      input({
         body: [
           paragraph(
             text("klikni", { href: "javascript:alert(1)" }),
@@ -59,7 +58,7 @@ describe.each<Variant>(["clean", "card"])("renderEmail (%s)", (variant) => {
 
   it("renders facts and a title for templates", async () => {
     const out = await renderEmail(
-      input(variant, {
+      input({
         title: "Potvrdenie dodávky",
         facts: [{ label: "Termín", value: "štvrtok 19. 11." }],
       }),
@@ -71,7 +70,7 @@ describe.each<Variant>(["clean", "card"])("renderEmail (%s)", (variant) => {
 
   it("keeps the logo single when a quote is present and quotes it in plain text", async () => {
     const out = await renderEmail(
-      input(variant, {
+      input({
         quote: {
           kind: "reply",
           headerLines: ["Dňa 20. 11. 2026 napísal(a) Jana:"],
@@ -87,7 +86,7 @@ describe.each<Variant>(["clean", "card"])("renderEmail (%s)", (variant) => {
 
   it("marks forwarded messages", async () => {
     const out = await renderEmail(
-      input(variant, {
+      input({
         quote: {
           kind: "forward",
           headerLines: ["Od: Jana", "Predmet: Test"],
@@ -97,5 +96,23 @@ describe.each<Variant>(["clean", "card"])("renderEmail (%s)", (variant) => {
     );
     expect(out.html).toContain("Preposlaná správa");
     expect(out.text).toContain("> Preposlaná správa");
+  });
+});
+
+describe("header layout", () => {
+  it("puts the title in the header next to the logo, right aligned, before the body", async () => {
+    const out = await renderEmail(input({ title: "Potvrdenie dodávky" }));
+    const logoAt = out.html.indexOf(LOGO);
+    const titleAt = out.html.indexOf("Potvrdenie dodávky", logoAt);
+    const bodyAt = out.html.indexOf("ďakujeme za správu", logoAt);
+    expect(logoAt).toBeGreaterThan(-1);
+    expect(titleAt).toBeGreaterThan(logoAt);
+    expect(titleAt).toBeLessThan(bodyAt);
+    expect(out.html.slice(logoAt, titleAt)).toContain("text-align:right");
+  });
+
+  it("shows only the logo when there is no title", async () => {
+    const out = await renderEmail(input());
+    expect(out.html).not.toContain("text-align:right;");
   });
 });

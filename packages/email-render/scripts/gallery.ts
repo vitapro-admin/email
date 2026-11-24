@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { paragraph, text, textToDoc } from "@aquapro/editor-schema";
 import type { Doc } from "@aquapro/editor-schema";
 import { escapeHtml, renderEmail } from "../src/index.js";
-import type { RenderInput, Variant } from "../src/index.js";
+import type { RenderInput } from "../src/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const logo = `data:image/png;base64,${readFileSync(join(here, "../assets/logo.png")).toString("base64")}`;
@@ -29,7 +29,7 @@ interface Scenario {
   id: string;
   title: string;
   note: string;
-  input: Omit<RenderInput, "variant" | "logoUrl" | "sender" | "company">;
+  input: Omit<RenderInput, "logoUrl" | "sender" | "company">;
 }
 
 const originalMessage: Doc = textToDoc(
@@ -135,29 +135,15 @@ const scenarios: Scenario[] = [
   },
 ];
 
-async function render(variant: Variant, scenario: Scenario): Promise<string> {
-  const { html } = await renderEmail({
-    ...scenario.input,
-    variant,
-    logoUrl: logo,
-    sender,
-    company,
-  });
-  return html;
-}
-
-const rows: string[] = [];
+const cards: string[] = [];
 for (const scenario of scenarios) {
-  const [clean, card] = await Promise.all([render("clean", scenario), render("card", scenario)]);
-  rows.push(`
-  <section>
-    <h2>${escapeHtml(scenario.title)}</h2>
+  const { html } = await renderEmail({ ...scenario.input, logoUrl: logo, sender, company });
+  cards.push(`
+  <figure>
+    <figcaption>${escapeHtml(scenario.title)}</figcaption>
     <p class="note">${escapeHtml(scenario.note)}</p>
-    <div class="pair">
-      <figure><figcaption>Variant A: čistý (biela stránka)</figcaption><iframe title="A ${escapeHtml(scenario.title)}" srcdoc="${escapeHtml(clean)}"></iframe></figure>
-      <figure><figcaption>Variant B: karta na sivom podklade</figcaption><iframe title="B ${escapeHtml(scenario.title)}" srcdoc="${escapeHtml(card)}"></iframe></figure>
-    </div>
-  </section>`);
+    <iframe title="${escapeHtml(scenario.title)}" srcdoc="${escapeHtml(html)}"></iframe>
+  </figure>`);
 }
 
 const page = `<!doctype html>
@@ -167,14 +153,14 @@ const page = `<!doctype html>
   body{margin:0;background:#e9eef3;color:#192c3b;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif}
   header,section{max-width:1480px;margin:0 auto;padding:24px 28px}
   h1{font-size:26px;margin:0 0 6px} h2{font-size:19px;margin:8px 0 4px} .note{margin:0 0 14px;color:#4c657b}
-  .pair{display:grid;grid-template-columns:1fr 1fr;gap:20px} figure{margin:0}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:24px} figure{margin:0}
   figcaption{font-weight:600;margin-bottom:8px}
-  iframe{width:100%;height:880px;border:1px solid #b9c9d8;border-radius:8px;background:#fff}
-  @media (max-width:1000px){.pair{grid-template-columns:1fr}}
+  iframe{width:100%;height:860px;border:1px solid #b9c9d8;border-radius:8px;background:#fff}
+  @media (max-width:1000px){.grid{grid-template-columns:1fr}}
 </style></head><body>
 <header><h1>Galéria dizajnu e-mailov AQUA PRO</h1>
-<p class="note">Dva smery rozloženia na rovnakých ukážkových správach. Všetky údaje sú vymyslené. Oba smery sa generujú z jedného predpisu, takže vzhľad je rovnaký pre šablóny aj voľné správy, aj pri odpovedi a preposlaní. Používateľ vzhľad meniť nemôže.</p></header>
-${rows.join("\n")}
+<p class="note">Schválený smer (variant A). Všetky údaje sú vymyslené. Vzhľad je rovnaký pre šablóny aj voľné správy, aj pri odpovedi a preposlaní. Používateľ vzhľad meniť nemôže.</p></header>
+<section><div class="grid">${cards.join("\n")}</div></section>
 </body></html>`;
 
 mkdirSync(join(here, "../gallery"), { recursive: true });

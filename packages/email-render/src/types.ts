@@ -1,8 +1,5 @@
 import type { Doc } from "@aquapro/editor-schema";
 
-/** "clean" = white page, left aligned (like a transactional mail). "card" = white card on grey page. */
-export type Variant = "clean" | "card";
-
 export interface Sender {
   name: string;
   role: string;
@@ -32,9 +29,8 @@ export interface CompanyInfo {
 }
 
 export interface RenderInput {
-  variant: Variant;
   subject: string;
-  /** Optional large heading, used by templates. Free messages normally have none. */
+  /** Optional heading shown at logo level, right aligned. Used by templates; free messages have none. */
   title?: string;
   body: Doc;
   /** Key facts from the CRM (label/value rows), used by templates. */

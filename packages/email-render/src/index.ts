@@ -9,3 +9,4 @@ export {
   quoteForReply,
 } from "./quote.js";
 export type { QuotableMessage } from "./quote.js";
+export { LOGO_CID, logoAttachment } from "./logo.js";

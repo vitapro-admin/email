@@ -14,7 +14,7 @@ jobs:
             -Dgreenmail.setup.test.smtp
             -Dgreenmail.setup.test.imap
             -Dgreenmail.hostname=0.0.0.0
-            -Dgreenmail.users=podpora:podpora@aquapro.test,ivana:ivana@aquapro.test,integracia:integracia@aquapro.test
+            -Dgreenmail.users=podpora:podpora@aquapro.test,ivana:ivana@aquapro.test,integracia:integracia@aquapro.test,prijemca:prijemca@aquapro.test
         ports:
           - 3025:3025
           - 3143:3143

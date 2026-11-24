@@ -1,3 +1,4 @@
+import { simpleParser } from "mailparser";
 import type { MailGateway } from "./gateway.js";
 import type { FolderInfo, ListMessagesOptions, MessageDetail, MessageSummary } from "./types.js";
 
@@ -30,6 +31,35 @@ export class InMemoryMailGateway implements MailGateway {
       .slice(0, limit)
       .map(toSummary);
     return Promise.resolve(result);
+  }
+
+  async appendMessage(
+    folder: string,
+    raw: Buffer,
+    flags: string[] = [],
+  ): Promise<{ uid?: number }> {
+    const parsed = await simpleParser(raw);
+    const list = this.folders.get(folder) ?? [];
+    const uid = list.reduce((max, m) => Math.max(max, m.uid), 0) + 1;
+    const first = parsed.from?.value[0];
+    const detail: MessageDetail = {
+      uid,
+      folder,
+      subject: parsed.subject ?? "",
+      from: { ...(first?.name ? { name: first.name } : {}), email: first?.address ?? "" },
+      date: parsed.date ?? new Date(),
+      seen: flags.includes("\\Seen"),
+      hasAttachments: parsed.attachments.some((a) => a.contentDisposition === "attachment"),
+      to: [],
+      cc: [],
+      messageId: parsed.messageId ?? "",
+      references: [],
+      attachments: [],
+    };
+    if (parsed.text) detail.text = parsed.text;
+    if (parsed.html) detail.html = parsed.html;
+    this.folders.set(folder, [...list, detail]);
+    return { uid };
   }
 
   getMessage(folder: string, uid: number): Promise<MessageDetail | null> {

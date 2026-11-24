@@ -9,7 +9,7 @@ services:
         -Dgreenmail.setup.test.smtp
         -Dgreenmail.setup.test.imap
         -Dgreenmail.hostname=0.0.0.0
-        -Dgreenmail.users=podpora:podpora@aquapro.test,ivana:ivana@aquapro.test,integracia:integracia@aquapro.test
+        -Dgreenmail.users=podpora:podpora@aquapro.test,ivana:ivana@aquapro.test,integracia:integracia@aquapro.test,prijemca:prijemca@aquapro.test
     ports:
       # Len z tohto počítača (127.0.0.1), nie z celej siete.
       - "127.0.0.1:3025:3025" # SMTP

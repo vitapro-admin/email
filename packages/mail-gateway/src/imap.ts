@@ -39,7 +39,9 @@ export class ImapMailGateway implements MailGateway {
       for (const folder of folders) {
         if (folder.flags.has("\\Noselect")) continue;
         const status = await client.status(folder.path, { messages: true, unseen: true });
+        const role = specialUseOf(folder.specialUse, folder.path);
         result.push({
+          ...(role ? { specialUse: role } : {}),
           path: folder.path,
           name: folder.name,
           total: status ? (status.messages ?? 0) : 0,
@@ -75,6 +77,19 @@ export class ImapMailGateway implements MailGateway {
       } finally {
         lock.release();
       }
+    });
+  }
+
+  async appendMessage(
+    folder: string,
+    raw: Buffer,
+    flags: string[] = [],
+  ): Promise<{ uid?: number }> {
+    return this.withClient(async (client) => {
+      if (!(await folderExists(client, folder))) await client.mailboxCreate(folder);
+      const result = await client.append(folder, raw, flags);
+      if (!result) return {};
+      return result.uid !== undefined ? { uid: result.uid } : {};
     });
   }
 
@@ -131,6 +146,23 @@ export class ImapMailGateway implements MailGateway {
     } finally {
       await client.logout().catch(() => undefined);
     }
+  }
+}
+
+function specialUseOf(flag: string | undefined, path: string): FolderInfo["specialUse"] {
+  switch (flag) {
+    case "\\Sent":
+      return "sent";
+    case "\\Drafts":
+      return "drafts";
+    case "\\Trash":
+      return "trash";
+    case "\\Junk":
+      return "junk";
+    case "\\Archive":
+      return "archive";
+    default:
+      return path.toUpperCase() === "INBOX" ? "inbox" : undefined;
   }
 }
 

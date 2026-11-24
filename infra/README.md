@@ -19,7 +19,7 @@ Zastavenie (zmaže všetky správy): `pnpm mail:down`
 | IMAP   | `127.0.0.1`, port `3143` |
 | SMTP   | `127.0.0.1`, port `3025` |
 
-Schránky (login = heslo): `podpora`, `ivana`, `integracia`. Schránka `integracia` slúži len automatickým testom.
+Schránky (login = heslo): `podpora`, `ivana`, `integracia`, `prijemca`. Schránky `integracia` a `prijemca` slúžia len automatickým testom.
 
 ## Testy proti skutočnému serveru
 

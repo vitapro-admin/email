@@ -11,6 +11,8 @@ export interface FolderInfo {
   name: string;
   total: number;
   unseen: number;
+  /** Role of the folder when the server marks one (RFC 6154). */
+  specialUse?: "inbox" | "sent" | "drafts" | "trash" | "junk" | "archive";
 }
 
 export interface AttachmentInfo {

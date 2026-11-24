@@ -61,6 +61,7 @@ apps/api                 API a reálny čas (WebSocket)
 packages/mail-gateway    IMAP a SMTP, abstrakcia protokolu
 packages/email-render    MJML šablóny, citácia, podpis
 packages/editor-schema   povolená schéma obsahu, čistenie vloženého textu
+packages/mail-sanitize   bezpečné zobrazenie prichádzajúceho HTML (sanitizér, sandbox)
 packages/ai-gateway      anonymizácia, volanie AI, záznam
 packages/crm-connector   Actiwhere API a zrkadlo
 packages/ui              spoločný dizajn AQUA PRO

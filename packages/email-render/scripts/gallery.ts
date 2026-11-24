@@ -133,17 +133,44 @@ const scenarios: Scenario[] = [
       },
     },
   },
+  {
+    id: "dlhy",
+    title: "5. Dlhý nadpis a dlhé slová",
+    note: "Skúška odolnosti: dlhý nadpis, dlhá webová adresa a dlhý e-mail v texte. Na telefóne sa dlhý nadpis presunie pod logo.",
+    input: {
+      subject: "Potvrdenie dodávky vody pre Hotel Panoráma v Poprade",
+      title: "Potvrdenie dodávky vody pre Hotel Panoráma v Poprade",
+      body: [
+        paragraph("Dobrý deň, pani Horváthová,"),
+        paragraph(
+          "podrobnosti o dodávke nájdete na ",
+          text("https://aquapro.example/zakaznicka-zona/dodavky/2026/11/potvrdenie-dodavky-48213", {
+            href: "https://aquapro.example/zakaznicka-zona/dodavky/2026/11/potvrdenie-dodavky-48213",
+          }),
+          ". V prípade otázok píšte na prevadzkova.podpora.dodavky@hotelpanorama-poprad.example.",
+        ),
+      ],
+      facts: [
+        { label: "Termín dodávky", value: "štvrtok 26. 11. 2026, 10:00 – 14:00" },
+        { label: "Adresa", value: "Hlavná 14, 058 01 Poprad, areál hotela, zadný vchod" },
+      ],
+    },
+  },
 ];
 
-const cards: string[] = [];
+const rows: string[] = [];
 for (const scenario of scenarios) {
   const { html } = await renderEmail({ ...scenario.input, logoUrl: logo, sender, company });
-  cards.push(`
-  <figure>
-    <figcaption>${escapeHtml(scenario.title)}</figcaption>
+  const escaped = escapeHtml(html);
+  rows.push(`
+  <section>
+    <h2>${escapeHtml(scenario.title)}</h2>
     <p class="note">${escapeHtml(scenario.note)}</p>
-    <iframe title="${escapeHtml(scenario.title)}" srcdoc="${escapeHtml(html)}"></iframe>
-  </figure>`);
+    <div class="pair">
+      <figure class="desktop"><figcaption>Počítač</figcaption><iframe title="Počítač: ${escapeHtml(scenario.title)}" srcdoc="${escaped}"></iframe></figure>
+      <figure class="phone"><figcaption>Telefón (375 px)</figcaption><div class="device"><iframe title="Telefón: ${escapeHtml(scenario.title)}" srcdoc="${escaped}"></iframe></div></figure>
+    </div>
+  </section>`);
 }
 
 const page = `<!doctype html>
@@ -151,16 +178,32 @@ const page = `<!doctype html>
 <title>AQUA PRO · Galéria dizajnu e-mailov</title>
 <style>
   body{margin:0;background:#e9eef3;color:#192c3b;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Helvetica,Arial,sans-serif}
-  header,section{max-width:1480px;margin:0 auto;padding:24px 28px}
+  header,section{max-width:1240px;margin:0 auto;padding:24px 28px}
   h1{font-size:26px;margin:0 0 6px} h2{font-size:19px;margin:8px 0 4px} .note{margin:0 0 14px;color:#4c657b}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:24px} figure{margin:0}
+  .pair{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap} figure{margin:0}
   figcaption{font-weight:600;margin-bottom:8px}
-  iframe{width:100%;height:860px;border:1px solid #b9c9d8;border-radius:8px;background:#fff}
-  @media (max-width:1000px){.grid{grid-template-columns:1fr}}
+  .desktop{flex:1 1 640px;min-width:0}
+  .desktop iframe{width:100%;height:600px;border:1px solid #b9c9d8;border-radius:8px;background:#fff;display:block}
+  .phone{flex:0 0 auto}
+  .device{width:375px;padding:12px;background:#1c2530;border-radius:34px;box-shadow:0 8px 24px #0003}
+  .device iframe{width:375px;height:640px;border:0;border-radius:22px;background:#fff;display:block}
 </style></head><body>
 <header><h1>Galéria dizajnu e-mailov AQUA PRO</h1>
-<p class="note">Schválený smer (variant A). Všetky údaje sú vymyslené. Vzhľad je rovnaký pre šablóny aj voľné správy, aj pri odpovedi a preposlaní. Používateľ vzhľad meniť nemôže.</p></header>
-<section><div class="grid">${cards.join("\n")}</div></section>
+<p class="note">Schválený smer (variant A) na počítači a na telefóne. Všetky údaje sú vymyslené. Vzhľad je rovnaký pre šablóny aj voľné správy, aj pri odpovedi a preposlaní. Používateľ vzhľad meniť nemôže.</p></header>
+${rows.join("\n")}
+<script>
+  // Fit each iframe to its email so nothing needs inner scrolling.
+  addEventListener("load", () => {
+    document.querySelectorAll("iframe").forEach((frame) => {
+      const fit = () => {
+        const doc = frame.contentDocument;
+        if (doc && doc.body) frame.style.height = doc.documentElement.scrollHeight + "px";
+      };
+      fit();
+      setTimeout(fit, 300);
+    });
+  });
+</script>
 </body></html>`;
 
 mkdirSync(join(here, "../gallery"), { recursive: true });

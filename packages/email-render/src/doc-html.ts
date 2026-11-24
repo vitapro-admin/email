@@ -45,7 +45,7 @@ export function docToHtml(doc: Doc, options: DocHtmlOptions = {}): string {
   const small = options.size === "small";
   const fontSize = small ? "13px" : "15px";
   const color = small ? COLORS.muted : COLORS.text;
-  const base = `font-size:${fontSize};line-height:1.6;color:${color};`;
+  const base = `font-size:${fontSize};line-height:1.6;color:${color};overflow-wrap:anywhere;word-wrap:break-word;`;
 
   const block = (b: Block): string => {
     switch (b.type) {

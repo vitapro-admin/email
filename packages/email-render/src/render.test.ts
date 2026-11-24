@@ -116,3 +116,23 @@ describe("header layout", () => {
     expect(out.html).not.toContain("text-align:right;");
   });
 });
+
+describe("mobile behaviour", () => {
+  it("keeps a short title beside the logo on phones", async () => {
+    const out = await renderEmail(input({ title: "Krátky nadpis" }));
+    expect(out.html).not.toMatch(/mj-outlook-group-fix hdr-long/);
+  });
+
+  it("lets a long title drop under the logo on phones", async () => {
+    const out = await renderEmail(
+      input({ title: "Potvrdenie dodávky vody pre Hotel Panoráma v Poprade" }),
+    );
+    expect(out.html).toMatch(/mj-outlook-group-fix hdr-long/);
+  });
+
+  it("ships the phone media query and wraps long words", async () => {
+    const out = await renderEmail(input({ body: [paragraph("x".repeat(200))] }));
+    expect(out.html).toContain("max-width:479px");
+    expect(out.html).toContain("overflow-wrap:anywhere");
+  });
+});

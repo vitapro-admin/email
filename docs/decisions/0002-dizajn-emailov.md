@@ -10,6 +10,12 @@ Každý odchádzajúci e-mail prejde jedným renderom (`packages/email-render`, 
 - Pod tým text správy, voliteľná tabuľka údajov z CRM (medzi tenkými čiarami), podpis, citovaná história a päta.
 - Variant B (karta na sivom podklade) bol zamietnutý a z kódu odstránený.
 
+## Správanie na telefóne
+
+- Krátky nadpis (do 24 znakov) ostáva vedľa loga aj na telefóne. Dlhší sa na telefóne presunie pod logo a zarovná doľava.
+- Na telefóne sú okraje menšie (22 px) a text väčší (16 px).
+- Dlhé slová, webové adresy a e-maily sa zalamujú, nikdy nepretekajú.
+
 ## Spoločné pravidlá
 
 - Logo je PNG a je v e-maile len raz (hore). Reply a forward používajú jednotný citovaný blok.

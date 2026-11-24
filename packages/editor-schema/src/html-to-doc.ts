@@ -104,6 +104,15 @@ function isHidden(style: string): boolean {
   return /display\s*:\s*none|visibility\s*:\s*hidden|mso-hide\s*:\s*all/i.test(style);
 }
 
+/** Removes zero-width characters (used by marketing mails to hide tracking text or pad previews). */
+function removeInvisible(value: string): string {
+  return value
+    .replaceAll("\u200b", "")
+    .replaceAll("\u200c", "")
+    .replaceAll("\u200d", "")
+    .replaceAll("\ufeff", "");
+}
+
 class Builder {
   readonly blocks: Block[] = [];
   private inline: Inline[] = [];
@@ -112,7 +121,7 @@ class Builder {
   constructor(private readonly options: HtmlToDocOptions) {}
 
   text(value: string, ctx: Ctx): void {
-    const cleaned = value.replace(/[​‌‍﻿]/g, "").replace(/\s+/g, " ");
+    const cleaned = removeInvisible(value).replace(/\s+/g, " ");
     if (!cleaned) return;
     const marks: Mark[] = [];
     if (ctx.bold) marks.push("bold");

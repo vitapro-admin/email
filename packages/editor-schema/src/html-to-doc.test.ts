@@ -105,6 +105,10 @@ describe("htmlToDoc: cleaning", () => {
     expect(out).toBe("Dobrý deň,\n\nĎakujem");
   });
 
+  it("removes zero-width characters used to hide text", () => {
+    expect(plain("<p>a\u200bb\u200c\u200dc\ufeffd</p>")).toBe("abcd");
+  });
+
   it("treats two line breaks as a paragraph break and trims edges", () => {
     const doc = htmlToDoc("<div> <br>  prvý<br><br><br>druhý  <br> </div>");
     expect(docToPlainText(doc)).toBe("prvý\n\ndruhý");

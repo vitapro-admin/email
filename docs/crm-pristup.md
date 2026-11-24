@@ -32,6 +32,7 @@ Cieľ: vyvíjať prepojenie na testovacom CRM tak, aby sa živé údaje nemohli 
 5. **Zmena stavu:** dá sa stav udalosti alebo dokumentu meniť cez API? (Z dokumentácie vyplýva, že `PATCH` majú len zákazníci a skladové doklady.)
 6. **Zmeny v údajoch:** existujú webhooky alebo iný spôsob, ako zistiť zmeny bez neustáleho sťahovania? Aký je limit volaní?
 7. **Testovacie prostredie:** je zápis povolený a ako sa údaje obnovujú?
+8. **Používatelia:** dá sa cez API alebo SQL (na čítanie) získať zoznam používateľov Actiwhere (meno, rola, aktívny alebo neaktívny, telefón, e-mail)? Dá sa používateľ vytvoriť alebo zablokovať cez API? Dokumentácia uvádza len prihlásenie (`/login`), nie správu používateľov.
 
 ## C. Ak prístup potrvá: anonymizované ukážky odpovedí
 

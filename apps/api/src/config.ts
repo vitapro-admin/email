@@ -64,10 +64,15 @@ export function loadConfig(env: Env = process.env): AppConfig {
     cookieSecure: flag(env["COOKIE_SECURE"], production),
     sessionIdleMs: Number(env["SESSION_IDLE_MINUTES"] ?? 30) * 60_000,
     sessionMaxMs: Number(env["SESSION_MAX_HOURS"] ?? 12) * 3_600_000,
-    allowedOrigins: (env["ALLOWED_ORIGINS"] ?? "")
-      .split(",")
-      .map((o) => o.trim())
-      .filter(Boolean),
+    allowedOrigins: [
+      // The Vite dev server (port 5173) forwards requests to this API, so its address is trusted
+      // in development only. In production only the same origin is accepted, plus ALLOWED_ORIGINS.
+      ...(production ? [] : ["http://localhost:5173", "http://127.0.0.1:5173"]),
+      ...(env["ALLOWED_ORIGINS"] ?? "")
+        .split(",")
+        .map((o) => o.trim())
+        .filter(Boolean),
+    ],
     webDist: env["WEB_DIST"] || undefined,
   };
 

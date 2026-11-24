@@ -188,6 +188,17 @@ describe("API", () => {
       expect(res.statusCode).toBe(403);
     });
 
+    it("accepts the Vite dev server origin in development and still blocks other origins", async () => {
+      const login = (origin: string) =>
+        h.call("POST", "/api/login", {
+          body: { username: "ivana", password: "tajne" },
+          headers: { origin, host: "127.0.0.1:3000" },
+        });
+      expect((await login("http://localhost:5173")).statusCode).toBe(200);
+      expect((await login("http://127.0.0.1:5173")).statusCode).toBe(200);
+      expect((await login("https://evil.example")).statusCode).toBe(403);
+    });
+
     it("sets security headers", async () => {
       const res = await h.call("GET", "/api/me");
       expect(res.headers["x-content-type-options"]).toBe("nosniff");
@@ -440,6 +451,15 @@ describe("config", () => {
     expect(() =>
       loadConfig({ NODE_ENV: "production", MAIL_ALLOW_INVALID_CERTIFICATES: "true" }),
     ).toThrow(/MAIL_ALLOW_INVALID_CERTIFICATES/);
+  });
+
+  it("trusts the Vite dev server only outside production", () => {
+    expect(loadConfig({}).allowedOrigins).toContain("http://localhost:5173");
+    expect(loadConfig({ NODE_ENV: "production" }).allowedOrigins).toEqual([]);
+    expect(
+      loadConfig({ NODE_ENV: "production", ALLOWED_ORIGINS: "https://posta.aquapro.example" })
+        .allowedOrigins,
+    ).toEqual(["https://posta.aquapro.example"]);
   });
 
   it("accepts a secure production setup", () => {

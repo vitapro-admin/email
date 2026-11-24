@@ -1,0 +1,22 @@
+{
+  "name": "@aquapro/email-render",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "gallery": "tsx scripts/gallery.ts"
+  },
+  "dependencies": {
+    "@aquapro/editor-schema": "workspace:*",
+    "mjml": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/mjml": "^5.4.2",
+    "tsx": "^4.23.15"
+  }
+}

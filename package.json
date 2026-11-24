@@ -16,7 +16,8 @@
     "mail:up": "docker compose -f infra/docker-compose.yml up -d",
     "mail:down": "docker compose -f infra/docker-compose.yml down",
     "mail:seed": "pnpm --filter @aquapro/infra seed",
-    "test:integration": "MAIL_TEST_IMAP_HOST=127.0.0.1 pnpm test"
+    "test:integration": "MAIL_TEST_IMAP_HOST=127.0.0.1 pnpm test",
+    "gallery": "pnpm --filter @aquapro/email-render gallery"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

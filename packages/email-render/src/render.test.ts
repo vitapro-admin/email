@@ -1,0 +1,101 @@
+import { paragraph, text, textToDoc } from "@aquapro/editor-schema";
+import { describe, expect, it } from "vitest";
+import { renderEmail } from "./render.js";
+import type { RenderInput, Variant } from "./types.js";
+
+const LOGO = "https://example.test/logo.png";
+
+function input(variant: Variant, overrides: Partial<RenderInput> = {}): RenderInput {
+  return {
+    variant,
+    subject: "Test",
+    body: textToDoc("Dobrý deň,\n\nďakujeme za správu."),
+    sender: {
+      name: "Ivana K.",
+      role: "Podpora obchodu",
+      phone: "+421 900 000 201",
+      email: "ivana@aquapro.test",
+    },
+    company: { name: "AQUA PRO EUROPE", legalLine: "Modelový text päty." },
+    logoUrl: LOGO,
+    ...overrides,
+  };
+}
+
+describe.each<Variant>(["clean", "card"])("renderEmail (%s)", (variant) => {
+  it("produces HTML with the logo once and a plain-text alternative", async () => {
+    const out = await renderEmail(input(variant));
+    expect(out.html.split(LOGO)).toHaveLength(2); // exactly one occurrence
+    expect(out.html).toContain("ďakujeme za správu");
+    expect(out.text).toContain("ďakujeme za správu");
+    expect(out.text).toContain("Ivana K.");
+  });
+
+  it("escapes user content", async () => {
+    const out = await renderEmail(
+      input(variant, { body: [paragraph('<script>alert("x")</script> & <img src=x onerror=1>')] }),
+    );
+    expect(out.html).not.toContain("<script>alert");
+    expect(out.html).not.toContain("<img src=x");
+    expect(out.html).toContain("&lt;script&gt;");
+  });
+
+  it("drops unsafe links but keeps the text", async () => {
+    const out = await renderEmail(
+      input(variant, {
+        body: [
+          paragraph(
+            text("klikni", { href: "javascript:alert(1)" }),
+            " a ",
+            text("web", { href: "https://aquapro.example" }),
+          ),
+        ],
+      }),
+    );
+    expect(out.html).not.toContain("javascript:");
+    expect(out.html).toContain("klikni");
+    expect(out.html).toContain('href="https://aquapro.example"');
+  });
+
+  it("renders facts and a title for templates", async () => {
+    const out = await renderEmail(
+      input(variant, {
+        title: "Potvrdenie dodávky",
+        facts: [{ label: "Termín", value: "štvrtok 19. 11." }],
+      }),
+    );
+    expect(out.html).toContain("Potvrdenie dodávky");
+    expect(out.html).toContain("štvrtok 19. 11.");
+    expect(out.text).toContain("Termín: štvrtok 19. 11.");
+  });
+
+  it("keeps the logo single when a quote is present and quotes it in plain text", async () => {
+    const out = await renderEmail(
+      input(variant, {
+        quote: {
+          kind: "reply",
+          headerLines: ["Dňa 20. 11. 2026 napísal(a) Jana:"],
+          body: textToDoc("Pôvodná správa."),
+        },
+      }),
+    );
+    expect(out.html.split(LOGO)).toHaveLength(2);
+    expect(out.html).toContain("Pôvodná správa.");
+    expect(out.text).toContain("> Dňa 20. 11. 2026 napísal(a) Jana:");
+    expect(out.text).toContain("> Pôvodná správa.");
+  });
+
+  it("marks forwarded messages", async () => {
+    const out = await renderEmail(
+      input(variant, {
+        quote: {
+          kind: "forward",
+          headerLines: ["Od: Jana", "Predmet: Test"],
+          body: textToDoc("Obsah."),
+        },
+      }),
+    );
+    expect(out.html).toContain("Preposlaná správa");
+    expect(out.text).toContain("> Preposlaná správa");
+  });
+});

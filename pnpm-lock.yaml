@@ -50,6 +50,9 @@ importers:
       '@aquapro/mail-sanitize':
         specifier: workspace:*
         version: link:../../packages/mail-sanitize
+      '@aquapro/tasks':
+        specifier: workspace:*
+        version: link:../../packages/tasks
       '@fastify/cookie':
         specifier: ^11.1.5
         version: 11.1.5
@@ -103,6 +106,9 @@ importers:
       '@aquapro/mail-gateway':
         specifier: workspace:*
         version: link:../../packages/mail-gateway
+      '@aquapro/tasks':
+        specifier: workspace:*
+        version: link:../../packages/tasks
       '@types/nodemailer':
         specifier: ^8.0.2
         version: 8.0.2
@@ -242,6 +248,19 @@ importers:
       '@types/sanitize-html':
         specifier: ^2.16.2
         version: 2.16.2
+
+  packages/tasks:
+    dependencies:
+      '@aquapro/db':
+        specifier: workspace:*
+        version: link:../db
+      '@aquapro/directory':
+        specifier: workspace:*
+        version: link:../directory
+    devDependencies:
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
 
 packages:
 

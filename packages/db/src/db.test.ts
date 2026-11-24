@@ -43,7 +43,7 @@ describe.skipIf(!TEST_DATABASE_URL)("PostgreSQL", () => {
   describe("migrations", () => {
     it("creates the schema and is a no-op the second time", async () => {
       const first = await migrate(db);
-      expect(first.applied).toEqual(["001_crm_mirror", "002_directory"]);
+      expect(first.applied).toEqual(["001_crm_mirror", "002_directory", "003_tasks"]);
       const tables = await db.query<{ table_name: string }>(
         "select table_name from information_schema.tables where table_schema = current_schema() order by 1",
       );
@@ -58,6 +58,7 @@ describe.skipIf(!TEST_DATABASE_URL)("PostgreSQL", () => {
         "role_permissions",
         "roles",
         "schema_migrations",
+        "tasks",
         "user_photos",
         "user_roles",
         "users",

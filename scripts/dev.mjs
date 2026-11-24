@@ -70,6 +70,9 @@ if (freshMail) {
 }
 say("Pripravujem testovacích používateľov");
 if (!run("pnpm", ["admin:demo"])) fail("Vytvorenie testovacích používateľov zlyhalo.");
+say("Pripravujem testovacie údaje z CRM (falošný server) a úlohy");
+if (!run("pnpm", ["crm:demo"])) fail("Načítanie testovacích údajov CRM zlyhalo.");
+if (!run("pnpm", ["tasks:demo"])) fail("Vytvorenie testovacích úloh zlyhalo.");
 
 const children = [];
 let stopping = false;

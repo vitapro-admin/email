@@ -136,3 +136,25 @@ export interface UploadedFile {
   contentType: string;
   size: number;
 }
+
+export interface TaskOwner {
+  id: number;
+  name: string;
+}
+
+export interface TaskSummary {
+  id: number;
+  source: "crm" | "local";
+  crmEventId: string | null;
+  title: string;
+  status: string | null;
+  category: string | null;
+  priority: string | null;
+  customerName: string | null;
+  owner: TaskOwner | null;
+  removedInCrm: boolean;
+  createdAt: string;
+  lastActivityAt: string;
+}
+
+export type TaskScope = "all" | "mine" | "unassigned";

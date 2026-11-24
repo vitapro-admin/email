@@ -21,6 +21,7 @@ export const PERMISSION_GROUPS = [
       { key: "tasks:view:own", label: "Vidieť vlastné úlohy" },
       { key: "tasks:view:department", label: "Vidieť úlohy svojho oddelenia" },
       { key: "tasks:view:all", label: "Vidieť všetky úlohy" },
+      { key: "tasks:manage", label: "Vytvárať a prideľovať úlohy" },
     ],
   },
   {

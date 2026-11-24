@@ -10,6 +10,9 @@ import type {
   AuditEntry,
   ListItem,
   PermissionGroup,
+  TaskOwner,
+  TaskScope,
+  TaskSummary,
   UploadedFile,
   UserInputBody,
 } from "./types";
@@ -185,4 +188,17 @@ export const adminApi = {
   ) => request<{ item: ListItem }>("PATCH", `/api/admin/lists/${kind}/${id}`, body),
   audit: (beforeId?: number) =>
     request<{ entries: AuditEntry[] }>("GET", `/api/admin/audit?${query({ limit: 50, beforeId })}`),
+};
+
+export const tasksApi = {
+  list: (scope: TaskScope, search: string) =>
+    request<{ tasks: TaskSummary[] }>(
+      "GET",
+      `/api/tasks?${query({ scope, search: search.trim() || undefined })}`,
+    ),
+  create: (title: string, ownerId: number | null) =>
+    request<{ task: TaskSummary }>("POST", "/api/tasks", { title, ownerId }),
+  assign: (id: number, ownerId: number | null) =>
+    request<{ task: TaskSummary }>("POST", `/api/tasks/${id}/assign`, { ownerId }),
+  assignees: () => request<{ users: TaskOwner[] }>("GET", "/api/task-assignees"),
 };

@@ -24,7 +24,9 @@ import { loadConfig } from "./config.js";
 import type { AppConfig } from "./config.js";
 import { toMessageView } from "./message-view.js";
 import { AttemptLimiter } from "./rate-limit.js";
+import type { TaskService } from "@aquapro/tasks";
 import { registerAdminRoutes } from "./admin.js";
+import { registerTaskRoutes } from "./tasks-routes.js";
 import { SessionStore } from "./sessions.js";
 import type { Session } from "./sessions.js";
 
@@ -39,6 +41,8 @@ export interface AppDeps {
   config?: AppConfig;
   /** User directory. Without it the app uses the development login with a made-up profile. */
   directory?: Directory;
+  /** Tasks. Needs the directory (permissions) as well. */
+  tasks?: TaskService;
   /** Mailbox access for a logged-in user. Replaceable in tests. */
   createGateway?: (session: Pick<Session, "username" | "password">) => MailGateway;
   createSender?: (session: Session) => MailSender;
@@ -308,6 +312,17 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
       if (!req.access) throw new Error("access missing");
       return req.access;
     });
+    if (deps.tasks) {
+      registerTaskRoutes(
+        app,
+        deps.tasks,
+        (req) => {
+          if (!req.access) throw new Error("access missing");
+          return req.access;
+        },
+        now,
+      );
+    }
   }
 
   // ---- mail

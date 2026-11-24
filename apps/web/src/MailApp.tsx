@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
+import { ModuleNav } from "./ModuleNav";
 import { TopBar } from "./TopBar";
 import { ApiError, api } from "./api";
 import { Compose } from "./Compose";
@@ -21,9 +22,10 @@ interface Props {
   onToggleTheme: () => void;
   onLogout: () => void;
   onOpenAdmin?: () => void;
+  onOpenTasks?: () => void;
 }
 
-export function MailApp({ user, theme, onToggleTheme, onLogout, onOpenAdmin }: Props) {
+export function MailApp({ user, theme, onToggleTheme, onLogout, onOpenAdmin, onOpenTasks }: Props) {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [folder, setFolder] = useState("INBOX");
   const [messages, setMessages] = useState<MessageSummary[]>([]);
@@ -134,6 +136,11 @@ export function MailApp({ user, theme, onToggleTheme, onLogout, onOpenAdmin }: P
     <div className="app">
       <aside className="sidebar">
         <Logo className="sidebar-logo" />
+        <ModuleNav
+          current="mail"
+          onOpenMail={() => undefined}
+          {...(onOpenTasks ? { onOpenTasks } : {})}
+        />
         <button type="button" className="primary wide" onClick={() => startCompose("new")}>
           Nová správa
         </button>

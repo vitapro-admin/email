@@ -20,6 +20,7 @@
   "devDependencies": {
     "@aquapro/db": "workspace:*",
     "@aquapro/directory": "workspace:*",
+    "@aquapro/tasks": "workspace:*",
     "@aquapro/editor-schema": "workspace:*",
     "@aquapro/mail-gateway": "workspace:*",
     "@types/nodemailer": "^8.0.2",

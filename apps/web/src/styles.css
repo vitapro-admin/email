@@ -1044,3 +1044,90 @@ img.avatar {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* tasks */
+.module-nav {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 3px;
+  background: var(--card);
+  border-radius: var(--radius);
+}
+.module-nav button {
+  min-height: 32px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 14px;
+}
+.module-nav button[aria-selected="true"] {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  font-weight: 600;
+}
+.list-search {
+  padding: 10px 12px 6px;
+}
+.row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+.task-detail {
+  padding: 20px 24px;
+}
+.task-detail .muted {
+  color: var(--muted);
+}
+.task-detail .small {
+  font-size: 12.5px;
+}
+.facts {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 8px 16px;
+  margin: 16px 0;
+}
+.facts dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+.facts dd {
+  margin: 0;
+}
+.task-detail select,
+.small-modal select {
+  padding: 8px 10px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  font: inherit;
+}
+.placeholder-box {
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+}
+.small-modal {
+  width: min(460px, 100%);
+  display: grid;
+  gap: 12px;
+}
+.small-modal .field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+.small-modal .field > span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--card);
+  font-size: 12.5px;
+}

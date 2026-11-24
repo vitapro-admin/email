@@ -14,6 +14,8 @@ export interface Access {
   roles: RoleRef[];
   permissions: Set<Permission>;
   isSuperadmin: boolean;
+  /** Department of the person (tasks of the department are visible to them). */
+  departmentId: number | null;
   /** Name, position and contact for the signature and the screen. */
   profile: Profile;
 }

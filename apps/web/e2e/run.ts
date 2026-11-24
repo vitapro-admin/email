@@ -12,7 +12,8 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
-import { createPool, migrate } from "@aquapro/db";
+import { createPool, ensureEnvironment, migrate, upsertRecords } from "@aquapro/db";
+import { TaskService } from "@aquapro/tasks";
 import type { Db } from "@aquapro/db";
 import { Directory } from "@aquapro/directory";
 import { ImapMailGateway, SmtpMailSender } from "@aquapro/mail-gateway";
@@ -70,6 +71,19 @@ async function prepareDirectory(): Promise<string | undefined> {
     lastName: "Obchodná",
     roleIds: [roleId("obchod")],
   });
+  // Two CRM events (made up) that become tasks.
+  await ensureEnvironment(adminDb, "test");
+  await upsertRecords(adminDb, "events", [
+    { crmId: "9921", data: { eventId: 9921, subject: "Otázka na servisný interval", statusId: 1 } },
+    {
+      crmId: "9934",
+      data: { eventId: 9934, subject: "Dopyt na prenájom dávkovačov", statusId: 1 },
+    },
+  ]);
+  await upsertRecords(adminDb, "ref:eventStatuses", [
+    { crmId: "1", data: { id: 1, name: "Otvorený" } },
+  ]);
+  await new TaskService(adminDb).adoptEvents();
   return `${dbUrl}${dbUrl.includes("?") ? "&" : "?"}options=-c%20search_path%3D${schema}`;
 }
 
@@ -208,6 +222,53 @@ async function adminScenario(browser: Browser, pageErrors: string[]) {
   await page.getByRole("button", { name: "← Späť do pošty" }).click();
   await page.getByRole("button", { name: "Nová správa" }).waitFor();
   await context.close();
+}
+
+async function tasksScenario(browser: Browser, pageErrors: string[]) {
+  const signIn = async (user: string) => {
+    const context = await browser.newContext({ viewport: { width: 1360, height: 860 } });
+    const page = await context.newPage();
+    page.on("pageerror", (e) => pageErrors.push(e.message));
+    await page.goto(BASE);
+    await page.getByLabel("Meno").fill(user);
+    await page.getByLabel("Heslo").fill(user);
+    await page.getByRole("button", { name: "Prihlásiť" }).click();
+    await page.getByRole("button", { name: "Nová správa" }).waitFor();
+    return { context, page };
+  };
+
+  step("úlohy: podpora vidí úlohy z CRM a pridelí jednu kolegovi");
+  const support = await signIn("ivana");
+  await support.page.getByRole("tab", { name: "Úlohy" }).click();
+  await support.page.getByRole("button", { name: /Otázka na servisný interval/ }).click();
+  await support.page.getByRole("heading", { name: "Otázka na servisný interval" }).waitFor();
+  await support.page.getByText("Otvorený", { exact: true }).first().waitFor();
+  await support.page
+    .getByLabel("Vlastník úlohy")
+    .selectOption({ label: "prijemca Test" })
+    .catch(async () => {
+      // the display name comes from the directory: "Zuzana Obchodná"
+      await support.page.getByLabel("Vlastník úlohy").selectOption({ label: "Zuzana Obchodná" });
+    });
+  await support.page.getByText("Úloha bola pridelená.").waitFor();
+  await screenshot(support.page, "12-ulohy");
+
+  step("úlohy: nová lokálna úloha");
+  await support.page.getByRole("button", { name: "Nová úloha" }).click();
+  await support.page.getByRole("dialog").getByLabel("Názov").fill("Zavolať zákazníkovi");
+  await support.page.getByRole("dialog").getByRole("button", { name: "Vytvoriť" }).click();
+  await support.page.getByRole("heading", { name: "Zavolať zákazníkovi" }).waitFor();
+  await support.context.close();
+
+  step("úlohy: kolega vidí len pridelenú úlohu a nemôže ju prideľovať");
+  const colleague = await signIn("prijemca");
+  await colleague.page.getByRole("tab", { name: "Úlohy" }).click();
+  await colleague.page.getByRole("button", { name: /Otázka na servisný interval/ }).click();
+  await colleague.page.getByRole("heading", { name: "Otázka na servisný interval" }).waitFor();
+  assert.equal(await colleague.page.getByRole("button", { name: /Dopyt na prenájom/ }).count(), 0);
+  assert.equal(await colleague.page.getByLabel("Vlastník úlohy").count(), 0);
+  assert.equal(await colleague.page.getByRole("button", { name: "Nová úloha" }).count(), 0);
+  await colleague.context.close();
 }
 
 async function main() {
@@ -514,6 +575,7 @@ async function main() {
     assert.equal(afterLogout.status(), 401);
 
     if (databaseUrl) await adminScenario(browser, pageErrors);
+    if (databaseUrl) await tasksScenario(browser, pageErrors);
     else step("správa používateľov sa preskočila (nie je nastavená E2E_DATABASE_URL)");
 
     assert.deepEqual(pageErrors, [], `chyby v prehliadači: ${pageErrors.join("; ")}`);

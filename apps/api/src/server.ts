@@ -1,5 +1,6 @@
 import { createPool, migrate } from "@aquapro/db";
 import { Directory } from "@aquapro/directory";
+import { TaskService } from "@aquapro/tasks";
 import { buildApp } from "./app.js";
 import { loadConfig } from "./config.js";
 
@@ -10,6 +11,6 @@ if (db) await migrate(db);
 const app = await buildApp({
   config,
   logger: true,
-  ...(db ? { directory: new Directory(db) } : {}),
+  ...(db ? { directory: new Directory(db), tasks: new TaskService(db) } : {}),
 });
 await app.listen({ port: config.port, host: config.host });

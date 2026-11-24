@@ -16,6 +16,7 @@
     "@aquapro/email-render": "workspace:*",
     "@aquapro/mail-gateway": "workspace:*",
     "@aquapro/mail-sanitize": "workspace:*",
+    "@aquapro/tasks": "workspace:*",
     "@fastify/cookie": "^11.1.5",
     "@fastify/static": "^10.1.12",
     "fastify": "^5.12.8",

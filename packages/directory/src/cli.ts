@@ -102,9 +102,33 @@ try {
         roleIds: [roleId("obchod")],
       },
     ];
+    // Departments and branches, so that tasks "of the department" and the profile lists work.
+    const departmentNames = ["Podpora obchodu", "Obchod", "Servis"];
+    const have = new Map((await directory.listItems("departments")).map((d) => [d.name, d.id]));
+    for (const name of departmentNames) {
+      if (!have.has(name))
+        have.set(name, (await directory.createItem(actor, "departments", name)).id);
+    }
+    if ((await directory.listItems("branches")).length === 0) {
+      await directory.createItem(actor, "branches", "Bratislava");
+    }
+    const departmentOf: Record<string, string> = {
+      ivana: "Podpora obchodu",
+      integracia: "Servis",
+      prijemca: "Obchod",
+    };
     for (const user of demo) {
-      if (existing.has(user.login)) continue;
-      await directory.createUser(actor, user);
+      const departmentId = have.get(departmentOf[user.login] ?? "") ?? null;
+      if (existing.has(user.login)) {
+        // Users created by an earlier version of the demo get their department added.
+        const current = (await directory.listUsers()).find((u) => u.login === user.login);
+        if (current && current.departmentId === null && departmentId !== null) {
+          await directory.updateUser(actor, current.id, { departmentId });
+          console.log(`Doplnené oddelenie: ${user.login}`);
+        }
+        continue;
+      }
+      await directory.createUser(actor, { ...user, departmentId });
       console.log(`Vytvorený používateľ: ${user.login}`);
     }
     console.log("Hotovo. Prihlasovacie heslá sú heslá testovacích schránok.");

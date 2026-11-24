@@ -146,6 +146,7 @@ export class Directory {
       roles: user.roles,
       permissions,
       isSuperadmin,
+      departmentId: user.departmentId,
       profile: toProfile(user, user.hasPhoto),
     };
   }

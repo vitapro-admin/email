@@ -20,4 +20,16 @@ export const DEFAULT_SPECS: EntitySpec[] = [
     },
   },
   { entity: "events", endpoint: "events", key: "events", idField: "eventId" },
+  // Reference tables give ids their readable names (status, category, priority of an event).
+  ...[
+    ["ref:eventStatuses", "eventStatuses"],
+    ["ref:eventCategories", "eventCategories"],
+    ["ref:priorities", "priorities"],
+  ].map(([entity, tableName]): EntitySpec => ({
+    entity: entity as string,
+    endpoint: "referenceData",
+    key: "referenceData",
+    idField: "id",
+    request: { filter: { tableName } },
+  })),
 ];

@@ -25,6 +25,7 @@
     "e2e": "E2E_DATABASE_URL=postgres://aquapro:aquapro-dev@127.0.0.1:5432/aquapro pnpm --filter @aquapro/web e2e",
     "crm:mock": "pnpm --filter @aquapro/crm-connector mock",
     "db:migrate": "DATABASE_URL=postgres://aquapro:aquapro-dev@127.0.0.1:5432/aquapro pnpm --filter @aquapro/db migrate",
+    "tasks:demo": "DATABASE_URL=postgres://aquapro:aquapro-dev@127.0.0.1:5432/aquapro pnpm --filter @aquapro/tasks demo",
     "crm:sync": "pnpm --filter @aquapro/crm-sync sync",
     "crm:demo": "DATABASE_URL=postgres://aquapro:aquapro-dev@127.0.0.1:5432/aquapro pnpm --filter @aquapro/crm-sync demo"
   },

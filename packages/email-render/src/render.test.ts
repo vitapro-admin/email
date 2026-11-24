@@ -30,6 +30,24 @@ describe("renderEmail", () => {
     expect(out.text).toContain("Ivana K.");
   });
 
+  it("shows the landline in the signature when the profile has one", async () => {
+    const withLine = await renderEmail(
+      input({
+        sender: {
+          name: "Ivana K.",
+          role: "Podpora obchodu",
+          phone: "+421 900 000 201",
+          landline: "055 123 456",
+          email: "ivana@aquapro.test",
+        },
+      }),
+    );
+    expect(withLine.html).toContain("055 123 456");
+    expect(withLine.text).toContain("+421 900 000 201 | 055 123 456 | ivana@aquapro.test");
+    const without = await renderEmail(input());
+    expect(without.text).not.toContain("055");
+  });
+
   it("escapes user content", async () => {
     const out = await renderEmail(
       input({ body: [paragraph('<script>alert("x")</script> & <img src=x onerror=1>')] }),

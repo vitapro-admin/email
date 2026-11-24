@@ -32,6 +32,12 @@ importers:
 
   apps/api:
     dependencies:
+      '@aquapro/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+      '@aquapro/directory':
+        specifier: workspace:*
+        version: link:../../packages/directory
       '@aquapro/editor-schema':
         specifier: workspace:*
         version: link:../../packages/editor-schema

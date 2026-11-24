@@ -450,11 +450,11 @@ export class Directory {
     return withTransaction(this.db, async (tx) => {
       const target = await this.loadUser(tx, id, true);
       if (!target) throw new DirectoryError("not-found", "Používateľ neexistuje.");
+      if (status === "disabled" && actor.userId === id)
+        throw new DirectoryError("self-action", "Sám seba nemôžete zablokovať.");
       if (isPrivileged(target.roles) && !actor.isSuperadmin)
         throw new DirectoryError("forbidden", "Admina a superadmina môže blokovať len superadmin.");
       if (status === "disabled") {
-        if (actor.userId === id)
-          throw new DirectoryError("self-action", "Sám seba nemôžete zablokovať.");
         if (target.roles.some((r) => r.key === SUPERADMIN_KEY) && target.status === "active")
           await this.requireAnotherSuperadmin(tx, id);
       }

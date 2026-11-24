@@ -21,6 +21,8 @@ export interface AppConfig {
   sessionMaxMs: number;
   /** Extra origins allowed to call the API (for the Vite dev server). Same origin is always allowed. */
   allowedOrigins: string[];
+  /** PostgreSQL with the user directory. Required in production. */
+  databaseUrl: string | undefined;
   /** Built web app to serve. Optional. */
   webDist: string | undefined;
 }
@@ -73,6 +75,7 @@ export function loadConfig(env: Env = process.env): AppConfig {
         .map((o) => o.trim())
         .filter(Boolean),
     ],
+    databaseUrl: env["DATABASE_URL"] || undefined,
     webDist: env["WEB_DIST"] || undefined,
   };
 
@@ -86,6 +89,8 @@ export function loadConfig(env: Env = process.env): AppConfig {
       problems.push("MAIL_ALLOW_INVALID_CERTIFICATES nesmie byť zapnuté");
     }
     if (!config.cookieSecure) problems.push("COOKIE_SECURE musí byť zapnuté");
+    if (!config.databaseUrl)
+      problems.push("DATABASE_URL (adresár používateľov) musí byť nastavená");
     if (problems.length > 0) {
       throw new Error(`Nebezpečná konfigurácia pre produkciu: ${problems.join("; ")}`);
     }

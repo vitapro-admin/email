@@ -4,6 +4,8 @@ export interface Sender {
   name: string;
   role: string;
   phone?: string;
+  /** Landline of the office, shown after the mobile number. */
+  landline?: string;
   email: string;
 }
 

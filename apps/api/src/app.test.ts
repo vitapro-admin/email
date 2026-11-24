@@ -743,24 +743,40 @@ describe("API: attachments and drafts", () => {
 });
 
 describe("config", () => {
+  const DB = "postgres://app@db.internal/aquapro";
+
+  it("requires the user directory database in production", () => {
+    expect(() => loadConfig({ NODE_ENV: "production" })).toThrow(/DATABASE_URL/);
+    expect(loadConfig({ NODE_ENV: "production", DATABASE_URL: DB }).databaseUrl).toBe(DB);
+  });
+
   it("refuses an insecure production setup", () => {
-    expect(() => loadConfig({ NODE_ENV: "production", IMAP_SECURE: "false" })).toThrow(/produkciu/);
     expect(() =>
-      loadConfig({ NODE_ENV: "production", MAIL_ALLOW_INVALID_CERTIFICATES: "true" }),
+      loadConfig({ NODE_ENV: "production", DATABASE_URL: DB, IMAP_SECURE: "false" }),
+    ).toThrow(/produkciu/);
+    expect(() =>
+      loadConfig({
+        NODE_ENV: "production",
+        DATABASE_URL: DB,
+        MAIL_ALLOW_INVALID_CERTIFICATES: "true",
+      }),
     ).toThrow(/MAIL_ALLOW_INVALID_CERTIFICATES/);
   });
 
   it("trusts the Vite dev server only outside production", () => {
     expect(loadConfig({}).allowedOrigins).toContain("http://localhost:5173");
-    expect(loadConfig({ NODE_ENV: "production" }).allowedOrigins).toEqual([]);
+    expect(loadConfig({ NODE_ENV: "production", DATABASE_URL: DB }).allowedOrigins).toEqual([]);
     expect(
-      loadConfig({ NODE_ENV: "production", ALLOWED_ORIGINS: "https://posta.aquapro.example" })
-        .allowedOrigins,
+      loadConfig({
+        NODE_ENV: "production",
+        DATABASE_URL: DB,
+        ALLOWED_ORIGINS: "https://posta.aquapro.example",
+      }).allowedOrigins,
     ).toEqual(["https://posta.aquapro.example"]);
   });
 
   it("accepts a secure production setup", () => {
-    const config = loadConfig({ NODE_ENV: "production" });
+    const config = loadConfig({ NODE_ENV: "production", DATABASE_URL: DB });
     expect(config.imap.secure).toBe(true);
     expect(config.cookieSecure).toBe(true);
     expect(config.imap.allowInvalidCertificates).toBe(false);

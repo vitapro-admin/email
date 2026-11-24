@@ -24,7 +24,7 @@ function factsRows(facts: Fact[]): string {
 }
 
 function signatureHtml(sender: Sender): string {
-  const contact = [sender.phone, sender.email].filter(Boolean) as string[];
+  const contact = [sender.phone, sender.landline, sender.email].filter(Boolean) as string[];
   const contactHtml = contact
     .map((c) =>
       c === sender.email
@@ -100,7 +100,9 @@ function buildText(input: RenderInput): string {
   if (input.title) parts.push(input.title.toUpperCase());
   parts.push(docToPlainText(input.body));
   if (input.facts?.length) parts.push(input.facts.map((f) => `${f.label}: ${f.value}`).join("\n"));
-  const contact = [input.sender.phone, input.sender.email].filter(Boolean).join(" | ");
+  const contact = [input.sender.phone, input.sender.landline, input.sender.email]
+    .filter(Boolean)
+    .join(" | ");
   parts.push(
     `S pozdravom\n${input.sender.name}\n${input.sender.role}, ${input.company.name}\n${contact}`,
   );

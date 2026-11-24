@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import type { Access } from "@aquapro/directory";
 import type { Sender } from "@aquapro/email-render";
 
 export interface Session {
@@ -10,6 +11,11 @@ export interface Session {
    */
   password: string;
   profile: Sender;
+  /** Directory user. Undefined only for the development login without a database. */
+  userId?: number;
+  /** Last permissions read from the directory and when (re-read every few seconds). */
+  access?: Access;
+  accessAt: number;
   createdAt: number;
   lastSeen: number;
 }
@@ -23,10 +29,19 @@ export class SessionStore {
     private readonly now: () => number = Date.now,
   ) {}
 
-  create(username: string, password: string, profile: Sender): Session {
+  create(username: string, password: string, profile: Sender, userId?: number): Session {
     const id = randomBytes(32).toString("base64url");
     const now = this.now();
-    const session: Session = { id, username, password, profile, createdAt: now, lastSeen: now };
+    const session: Session = {
+      id,
+      username,
+      password,
+      profile,
+      accessAt: now,
+      createdAt: now,
+      lastSeen: now,
+      ...(userId === undefined ? {} : { userId }),
+    };
     this.sessions.set(id, session);
     return session;
   }

@@ -1,0 +1,33 @@
+{
+  "name": "@aquapro/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json",
+    "test": "vitest run",
+    "dev": "vite",
+    "build": "vite build",
+    "e2e": "vite build && tsx e2e/run.ts"
+  },
+  "dependencies": {
+    "@tiptap/pm": "^3.35.0",
+    "@tiptap/react": "^3.35.0",
+    "@tiptap/starter-kit": "^3.35.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@aquapro/editor-schema": "workspace:*",
+    "@aquapro/mail-gateway": "workspace:*",
+    "@types/nodemailer": "^8.0.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "nodemailer": "^10.6.1",
+    "playwright": "^1.65.1",
+    "tsx": "^4.23.15",
+    "vite": "^8.3.8",
+    "vitest": "^3.2.7"
+  }
+}

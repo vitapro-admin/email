@@ -6,3 +6,5 @@ node_modules/
 dist/
 coverage/
 packages/email-render/gallery/
+apps/web/dist/
+apps/web/e2e/screenshots/

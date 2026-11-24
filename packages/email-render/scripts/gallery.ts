@@ -6,10 +6,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { paragraph, text, textToDoc } from "@aquapro/editor-schema";
-import type { Doc } from "@aquapro/editor-schema";
-import { escapeHtml, renderEmail } from "../src/index.js";
-import type { RenderInput } from "../src/index.js";
+import { htmlToDoc, paragraph, text } from "@aquapro/editor-schema";
+import { escapeHtml, quoteForForward, quoteForReply, renderEmail } from "../src/index.js";
+import type { QuotableMessage, RenderInput } from "../src/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const logo = `data:image/png;base64,${readFileSync(join(here, "../assets/logo.png")).toString("base64")}`;
@@ -32,9 +31,29 @@ interface Scenario {
   input: Omit<RenderInput, "logoUrl" | "sender" | "company">;
 }
 
-const originalMessage: Doc = textToDoc(
-  "Dobrý deň,\n\ndve fľaše z poslednej dodávky majú zakalenú vodu. Prosíme o výmenu a stanovisko.\n\nĎakujem,\nJana Horváthová\nHotel Panoráma",
-);
+/** A message as Outlook really sends it: fonts, colors, Word markup, and older history below. */
+const received: QuotableMessage = {
+  from: { name: "Jana Horváthová", email: "j.horvathova@hotelpanorama.example" },
+  to: [{ email: "podpora@aquapro.example" }],
+  date: new Date("2026-11-19T06:48:00Z"),
+  subject: "Reklamácia dodávky: zakalená voda",
+  html: `<html><head><style>p.MsoNormal{font-family:Calibri}</style></head><body>
+    <p class="MsoNormal"><span style="font-family:Calibri;font-size:11pt;color:#1F497D">Dobrý deň,<o:p></o:p></span></p>
+    <p class="MsoNormal"><span style="font-family:'Comic Sans MS';font-size:14pt;color:red">dve fľaše z poslednej dodávky majú <b>zakalenú vodu</b>.</span> Prosíme o výmenu a stanovisko.<o:p></o:p></p>
+    <p class="MsoNormal">Ďakujem,<br>Jana Horváthová<br>Hotel Panoráma<o:p></o:p></p>
+    <div id="appendonsend"></div><hr>
+    <div id="divRplyFwdMsg"><b>Od:</b> Ivana K.<br><b>Odoslané:</b> 17. 11. 2026 14:20</div>
+    <div>Dodávka 24 × 19 l fľaša bola vykonaná.</div></body></html>`,
+};
+
+const wordPaste = `<html xmlns:o="urn:schemas-microsoft-com:office:office"><head><style>p.MsoNormal{margin:0cm;font-size:11.0pt;font-family:"Calibri",sans-serif}</style></head><body>
+  <!--[if gte mso 9]><xml><o:OfficeDocumentSettings><o:AllowPNG/></o:OfficeDocumentSettings></xml><![endif]-->
+  <p class="MsoNormal"><b><span style="font-size:16.0pt;font-family:'Comic Sans MS';color:red">Dôležité upozornenie</span></b></p>
+  <p class="MsoNormal"><span style="font-family:'Times New Roman';font-size:9pt;color:green">Dobrý deň, pani Horváthová,</span></p>
+  <p class="MsoNormal"><span style="font-size:20pt">výmenu fľaší zabezpečíme </span><i><span style="color:blue">pri najbližšej dodávke</span></i>. Podrobnosti: <a href="https://aquapro.example"><span style="color:purple">aquapro.example</span></a>
+  <img src="http://tracker.example/pixel.gif" width="1" height="1"></p>
+  <ul><li style="font-family:Arial;font-size:18pt">výmena do 26. 11.</li><li>kontrola dávkovača</li></ul>
+  <p class="MsoNormal"><o:p>&nbsp;</o:p></p></body></html>`;
 
 const scenarios: Scenario[] = [
   {
@@ -91,7 +110,7 @@ const scenarios: Scenario[] = [
   {
     id: "odpoved",
     title: "3. Odpoveď s citovanou správou",
-    note: "Pôvodná správa je zjednodušená do jednotného citovaného bloku. Logo je len raz, hore.",
+    note: "Pôvodná správa prišla z Outlooku s fontmi, farbami a starou históriou. Citovaný je len jej najnovší text v jednotnom bloku, logo je len raz.",
     input: {
       subject: "Re: Reklamácia dodávky: zakalená voda",
       body: [
@@ -100,19 +119,13 @@ const scenarios: Scenario[] = [
           "ďakujeme za Vašu správu a ospravedlňujeme sa za komplikácie. Reklamáciu sme prijali pod číslom DOK-48213 a do 2 pracovných dní sa Vám ozveme s konkrétnym riešením.",
         ),
       ],
-      quote: {
-        kind: "reply",
-        headerLines: [
-          "Dňa 19. 11. 2026 o 7:48 Jana Horváthová <j.horvathova@hotelpanorama.example> napísal(a):",
-        ],
-        body: originalMessage,
-      },
+      quote: quoteForReply(received),
     },
   },
   {
     id: "forward",
     title: "4. Preposlaná správa",
-    note: "Pôvodná správa s hlavičkou (od, dátum, predmet, komu) v rovnakom jednotnom bloku.",
+    note: "Rovnaká pôvodná správa, tentoraz celá (aj so starším textom) s hlavičkou od, dátum, predmet, komu v jednotnom bloku.",
     input: {
       subject: "Fwd: Reklamácia dodávky: zakalená voda",
       body: [
@@ -121,16 +134,7 @@ const scenarios: Scenario[] = [
           "posielam Ti reklamáciu na doriešenie so servisom. Prosím, ozvi sa klientke do zajtra.",
         ),
       ],
-      quote: {
-        kind: "forward",
-        headerLines: [
-          "Od: Jana Horváthová <j.horvathova@hotelpanorama.example>",
-          "Dátum: 19. 11. 2026 7:48",
-          "Predmet: Reklamácia dodávky: zakalená voda",
-          "Komu: podpora@aquapro.example",
-        ],
-        body: originalMessage,
-      },
+      quote: quoteForForward(received),
     },
   },
   {
@@ -154,6 +158,15 @@ const scenarios: Scenario[] = [
         { label: "Termín dodávky", value: "štvrtok 26. 11. 2026, 10:00 – 14:00" },
         { label: "Adresa", value: "Hlavná 14, 058 01 Poprad, areál hotela, zadný vchod" },
       ],
+    },
+  },
+  {
+    id: "word",
+    title: "6. Text vložený z Wordu",
+    note: "Pracovník vloží text z Wordu s červeným písmom Comic Sans, rôznymi veľkosťami, obrázkom a skrytými značkami. V e-maile zostane len povolené formátovanie, vzhľad určuje systém.",
+    input: {
+      subject: "Dôležité upozornenie",
+      body: htmlToDoc(wordPaste),
     },
   },
 ];

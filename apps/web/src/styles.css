@@ -153,17 +153,17 @@ label {
   color: var(--muted);
 }
 
-/* logos: the one for the current theme is shown */
+/* logos: the one for the current theme is shown (selectors are specific so no later rule can show both) */
 .logo {
   display: block;
 }
-.logo-dark {
+.logo.logo-dark {
   display: none;
 }
-:root[data-theme="dark"] .logo-light {
+:root[data-theme="dark"] .logo.logo-light {
   display: none;
 }
-:root[data-theme="dark"] .logo-dark {
+:root[data-theme="dark"] .logo.logo-dark {
   display: block;
 }
 
@@ -222,7 +222,6 @@ label {
   min-height: 0;
 }
 .sidebar-logo {
-  display: block;
   width: 132px;
   margin: 4px auto 10px;
 }
@@ -582,6 +581,107 @@ label {
   gap: 12px;
   padding: 12px 18px;
   border-top: 1px solid var(--border);
+}
+
+/* attachments */
+.attachments-box {
+  display: grid;
+  gap: 6px;
+}
+.attachments-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.attachments-bar .hint {
+  margin: 0;
+}
+.attach-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.attach-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+  background: var(--card);
+  font-size: 14px;
+}
+.attach-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.attach-list .ghost {
+  min-height: 26px;
+  width: 26px;
+  padding: 0;
+  border-radius: 50%;
+}
+.compose[data-dragging="true"] {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}
+.foot-status {
+  display: grid;
+  gap: 2px;
+}
+.foot-status .hint {
+  margin: 0;
+}
+
+/* confirmation when closing an unsent message */
+.confirm-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 16, 24, 0.45);
+  display: grid;
+  place-items: center;
+  z-index: 5;
+}
+.compose {
+  position: relative;
+}
+.confirm {
+  width: min(420px, calc(100% - 32px));
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: 0 12px 36px rgba(10, 16, 24, 0.3);
+}
+.confirm h3 {
+  margin: 0 0 6px;
+  font-size: 17px;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+.confirm p {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+button.danger {
+  color: var(--neg);
+  border-color: var(--neg);
+  background: transparent;
+}
+button.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--neg) 12%, var(--surface));
 }
 
 /* editor */

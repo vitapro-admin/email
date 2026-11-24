@@ -19,3 +19,5 @@ export type {
 } from "./outgoing.js";
 export { SmtpMailSender, buildRawMessage } from "./smtp.js";
 export type { SmtpConfig } from "./smtp.js";
+export { DRAFT_STATE_FILENAME, buildDraftRaw } from "./draft.js";
+export type { DraftInput } from "./draft.js";

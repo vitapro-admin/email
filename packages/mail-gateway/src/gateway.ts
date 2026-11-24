@@ -19,6 +19,8 @@ export interface MailGateway {
   getAttachment(folder: string, uid: number, index: number): Promise<AttachmentContent | null>;
   /** Sets or clears the "read" flag. Returns false when the message does not exist. */
   markSeen(folder: string, uid: number, seen: boolean): Promise<boolean>;
+  /** Permanently removes a message. Returns false when it does not exist. Used for drafts. */
+  deleteMessage(folder: string, uid: number): Promise<boolean>;
   /** Stores a complete message (RFC 822) in a folder, creating the folder if needed. Used for Sent. */
   appendMessage(folder: string, raw: Buffer, flags?: string[]): Promise<{ uid?: number }>;
 }

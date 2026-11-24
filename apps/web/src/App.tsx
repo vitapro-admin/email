@@ -26,7 +26,13 @@ function parseComposeHash(
   if (mode !== "new" && mode !== "reply" && mode !== "replyAll" && mode !== "forward") return null;
   const folder = params.get("folder") ?? undefined;
   const uid = Number(params.get("uid")) || undefined;
-  return { mode, ...(folder ? { folder } : {}), ...(uid ? { uid } : {}) };
+  const draftUid = Number(params.get("draft")) || undefined;
+  return {
+    mode,
+    ...(folder ? { folder } : {}),
+    ...(uid ? { uid } : {}),
+    ...(draftUid ? { draftUid } : {}),
+  };
 }
 
 export function App() {

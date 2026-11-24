@@ -33,6 +33,12 @@ interface Harness {
   sent: { message: OutgoingMessage; raw: Buffer }[];
   clock: { now: number };
   login: () => Promise<string>;
+  upload: (
+    cookie: string,
+    name: string,
+    content: Buffer,
+    headers?: Record<string, string>,
+  ) => Promise<LightMyRequestResponse>;
   call: (
     method: "GET" | "POST",
     url: string,
@@ -41,15 +47,26 @@ interface Harness {
 }
 
 async function harness(): Promise<Harness> {
-  const gateway = new InMemoryMailGateway({
-    INBOX: [
-      seedMessage(1),
-      seedMessage(2, {
-        subject: "Re: Re: Dopyt",
-        html: '<p>Ahoj</p><script>alert(1)</script><img src="https://tracker.example/p.gif" width="1" height="1"><img src="https://ok.example/a.png" width="300"><a href="https://evil.example">https://www.mojabanka.sk</a>',
-      }),
-    ],
-  });
+  const gateway = new InMemoryMailGateway(
+    {
+      INBOX: [
+        seedMessage(1),
+        seedMessage(2, {
+          subject: "Re: Re: Dopyt",
+          html: '<p>Ahoj</p><script>alert(1)</script><img src="https://tracker.example/p.gif" width="1" height="1"><img src="https://ok.example/a.png" width="300"><a href="https://evil.example">https://www.mojabanka.sk</a>',
+        }),
+      ],
+      Archive: [
+        seedMessage(1, {
+          folder: "Archive",
+          subject: "Dodací list",
+          hasAttachments: true,
+          attachments: [{ filename: "foto.txt", contentType: "text/plain", size: 3 }],
+        }),
+      ],
+    },
+    { "Archive/1": [Buffer.from("abc")] },
+  );
   const sent: Harness["sent"] = [];
   const clock = { now: 1_000_000 };
   const sender: MailSender = {
@@ -83,7 +100,15 @@ async function harness(): Promise<Harness> {
     });
     return res.cookies.find((c) => c.name === "aq_session")?.value ?? "";
   };
-  return { app, gateway, sent, clock, login, call };
+  const upload: Harness["upload"] = (cookie, name, content, headers = {}) =>
+    app.inject({
+      method: "POST",
+      url: `/api/uploads?name=${encodeURIComponent(name)}`,
+      cookies: { aq_session: cookie },
+      headers: { "content-type": "application/octet-stream", "x-aq-client": "web", ...headers },
+      payload: content,
+    });
+  return { app, gateway, sent, clock, login, upload, call };
 }
 
 describe("API", () => {
@@ -275,6 +300,7 @@ describe("API", () => {
         to: "Jana Horváthová <j.horvathova@hotelpanorama.example>",
         cc: "",
         subject: "Re: Reklamácia dodávky",
+        attachments: [],
       });
     });
 
@@ -291,7 +317,7 @@ describe("API", () => {
       const res = await h.call("GET", "/api/compose/prepare?mode=forward&folder=INBOX&uid=2", {
         cookie,
       });
-      expect(res.json()).toEqual({ to: "", cc: "", subject: "Fwd: Dopyt" });
+      expect(res.json()).toEqual({ to: "", cc: "", subject: "Fwd: Dopyt", attachments: [] });
     });
   });
 
@@ -441,6 +467,277 @@ describe("API", () => {
         body: { mode: "reply", folder: "INBOX", uid: 999, to: "a@b.sk", subject: "x", doc },
       });
       expect(res.statusCode).toBe(404);
+    });
+  });
+});
+
+describe("API: attachments and drafts", () => {
+  let h: Harness;
+  beforeEach(async () => {
+    h = await harness();
+  });
+  afterEach(async () => {
+    await h.app.close();
+  });
+
+  const doc = [{ type: "paragraph", content: [{ type: "text", text: "Posielam podklady." }] }];
+  const send = (cookie: string, extra: Record<string, unknown> = {}) =>
+    h.call("POST", "/api/compose/send", {
+      cookie,
+      body: { mode: "new", to: "klient@firma.example", subject: "Podklady", doc, ...extra },
+    });
+
+  describe("uploads", () => {
+    it("stores a file and sends it with the message, then forgets it", async () => {
+      const cookie = await h.login();
+      const up = await h.upload(cookie, "cennik.pdf", Buffer.from("PDFDATA"));
+      expect(up.statusCode).toBe(200);
+      const file = up.json();
+      expect(file).toMatchObject({
+        filename: "cennik.pdf",
+        size: 7,
+        contentType: "application/pdf",
+      });
+
+      expect((await send(cookie, { attachmentIds: [file.id] })).statusCode).toBe(200);
+      const outgoing = h.sent[0]?.message;
+      expect(outgoing?.attachments).toHaveLength(1);
+      expect(outgoing?.attachments?.[0]?.content.toString()).toBe("PDFDATA");
+      const parsed = await simpleParser(h.sent[0]?.raw ?? Buffer.alloc(0));
+      expect(parsed.attachments.map((a) => a.filename)).toContain("cennik.pdf");
+
+      const again = await send(cookie, { attachmentIds: [file.id] });
+      expect(again.statusCode).toBe(400);
+      expect(again.json().error.code).toBe("attachment-missing");
+    });
+
+    it("cleans the file name", async () => {
+      const cookie = await h.login();
+      const file = (
+        await h.upload(cookie, "../../etc/passwd\r\nX: y.txt", Buffer.from("x"))
+      ).json();
+      expect(file.filename).not.toContain("/");
+      expect(file.filename).not.toMatch(/[\r\n]/);
+    });
+
+    it.each(["program.exe", "skript.JS", "faktura.pdf.exe", "pokus.bat", "inštalátor.msi"])(
+      "refuses %s",
+      async (name) => {
+        const cookie = await h.login();
+        const res = await h.upload(cookie, name, Buffer.from("x"));
+        expect(res.statusCode).toBe(400);
+        expect(res.json().error.code).toBe("blocked-file");
+      },
+    );
+
+    it("allows a harmless name that merely contains a blocked word", async () => {
+      const cookie = await h.login();
+      expect((await h.upload(cookie, "exe-navod.pdf", Buffer.from("x"))).statusCode).toBe(200);
+      expect((await h.upload(cookie, "faktura.exe.pdf", Buffer.from("x"))).statusCode).toBe(200);
+    });
+
+    it("refuses an empty file, an oversized file and a total over the limit", async () => {
+      const cookie = await h.login();
+      expect((await h.upload(cookie, "prazdny.txt", Buffer.alloc(0))).json().error.code).toBe(
+        "empty-file",
+      );
+      const huge = await h.upload(cookie, "velky.zip", Buffer.alloc(20 * 1024 * 1024 + 10));
+      expect(huge.statusCode).toBe(413);
+      expect((await h.upload(cookie, "a.zip", Buffer.alloc(11 * 1024 * 1024))).statusCode).toBe(
+        200,
+      );
+      expect((await h.upload(cookie, "b.zip", Buffer.alloc(11 * 1024 * 1024))).statusCode).toBe(
+        413,
+      );
+    });
+
+    it("keeps files private to the session that uploaded them", async () => {
+      const first = await h.login();
+      const second = await h.login();
+      const file = (await h.upload(first, "tajne.txt", Buffer.from("x"))).json();
+      const res = await send(second, { attachmentIds: [file.id] });
+      expect(res.statusCode).toBe(400);
+      expect(res.json().error.code).toBe("attachment-missing");
+      expect(h.sent).toHaveLength(0);
+    });
+
+    it("lets the user remove a file before sending", async () => {
+      const cookie = await h.login();
+      const file = (await h.upload(cookie, "a.txt", Buffer.from("x"))).json();
+      expect((await h.call("GET", "/api/me", { cookie })).statusCode).toBe(200);
+      const removed = await h.app.inject({
+        method: "DELETE",
+        url: `/api/uploads/${file.id}`,
+        cookies: { aq_session: cookie },
+        headers: { "x-aq-client": "web" },
+      });
+      expect(removed.json()).toEqual({ removed: true });
+      expect((await send(cookie, { attachmentIds: [file.id] })).statusCode).toBe(400);
+    });
+
+    it("requires login and the web client header", async () => {
+      expect((await h.upload("", "a.txt", Buffer.from("x"))).statusCode).toBe(401);
+      const cookie = await h.login();
+      const res = await h.app.inject({
+        method: "POST",
+        url: "/api/uploads?name=a.txt",
+        cookies: { aq_session: cookie },
+        headers: { "content-type": "application/octet-stream" },
+        payload: Buffer.from("x"),
+      });
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  describe("forward with attachments", () => {
+    it("brings the original attachments along as normal attachments the user can remove", async () => {
+      const cookie = await h.login();
+      const prepared = (
+        await h.call("GET", "/api/compose/prepare?mode=forward&folder=Archive&uid=1", { cookie })
+      ).json();
+      expect(prepared.attachments).toHaveLength(1);
+      expect(prepared.attachments[0]).toMatchObject({ filename: "foto.txt", size: 3 });
+
+      await send(cookie, {
+        mode: "forward",
+        folder: "Archive",
+        uid: 1,
+        attachmentIds: [prepared.attachments[0].id],
+      });
+      expect(h.sent[0]?.message.attachments?.[0]?.content.toString()).toBe("abc");
+    });
+
+    it("sends without the original attachment when the user removed it", async () => {
+      const cookie = await h.login();
+      await h.call("GET", "/api/compose/prepare?mode=forward&folder=Archive&uid=1", { cookie });
+      await send(cookie, {
+        mode: "forward",
+        folder: "Archive",
+        uid: 1,
+        doc: [],
+        attachmentIds: [],
+      });
+      expect(h.sent[0]?.message.attachments).toBeUndefined();
+    });
+  });
+
+  describe("drafts", () => {
+    const draft = (cookie: string, extra: Record<string, unknown> = {}) =>
+      h.call("POST", "/api/drafts", {
+        cookie,
+        body: {
+          mode: "new",
+          to: "klient@firma.example, abc",
+          cc: "",
+          bcc: "",
+          subject: "Rozpísané",
+          doc,
+          ...extra,
+        },
+      });
+
+    it("saves an incomplete draft (no recipient, no subject, no text) without complaint", async () => {
+      const cookie = await h.login();
+      const res = await draft(cookie, { to: "", subject: "", doc: [] });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().uid).toBeGreaterThan(0);
+      expect(h.sent).toHaveLength(0);
+    });
+
+    it("stores the draft in Drafts and reopens it exactly, with attachments", async () => {
+      const cookie = await h.login();
+      const file = (await h.upload(cookie, "podklad.txt", Buffer.from("obsah"))).json();
+      const saved = (
+        await draft(cookie, {
+          cc: "kopia@firma.example",
+          bcc: "skryta@firma.example",
+          attachmentIds: [file.id],
+        })
+      ).json();
+
+      const list = await h.gateway.listMessages("Drafts");
+      expect(list.map((m) => m.subject)).toEqual(["Rozpísané"]);
+
+      const opened = (await h.call("GET", `/api/drafts/open?uid=${saved.uid}`, { cookie })).json();
+      expect(opened).toMatchObject({
+        v: 1,
+        mode: "new",
+        to: "klient@firma.example, abc",
+        cc: "kopia@firma.example",
+        bcc: "skryta@firma.example",
+        subject: "Rozpísané",
+        doc,
+        draftUid: saved.uid,
+      });
+      expect(opened.attachments).toHaveLength(1);
+      expect(opened.attachments[0].filename).toBe("podklad.txt");
+      expect(JSON.stringify(opened.attachments)).not.toContain("aquapro-draft");
+    });
+
+    it("replaces the previous version instead of piling up drafts", async () => {
+      const cookie = await h.login();
+      const first = (await draft(cookie)).json();
+      const second = (await draft(cookie, { draftUid: first.uid, subject: "Rozpísané 2" })).json();
+      expect(second.uid).not.toBe(first.uid);
+      const list = await h.gateway.listMessages("Drafts");
+      expect(list.map((m) => m.subject)).toEqual(["Rozpísané 2"]);
+    });
+
+    it("keeps the old version when saving the new one fails", async () => {
+      const cookie = await h.login();
+      const first = (await draft(cookie)).json();
+      const failing = await draft(cookie, { draftUid: first.uid, attachmentIds: ["neexistuje"] });
+      expect(failing.statusCode).toBe(400);
+      expect((await h.gateway.listMessages("Drafts")).map((m) => m.uid)).toEqual([first.uid]);
+    });
+
+    it("deletes the draft after the message is sent", async () => {
+      const cookie = await h.login();
+      const saved = (await draft(cookie)).json();
+      expect((await send(cookie, { draftUid: saved.uid })).statusCode).toBe(200);
+      expect(await h.gateway.listMessages("Drafts")).toEqual([]);
+    });
+
+    it("discards a draft on request and reports one that is already gone", async () => {
+      const cookie = await h.login();
+      const saved = (await draft(cookie)).json();
+      const call = () =>
+        h.app.inject({
+          method: "DELETE",
+          url: `/api/drafts?uid=${saved.uid}`,
+          cookies: { aq_session: cookie },
+          headers: { "x-aq-client": "web" },
+        });
+      expect((await call()).json()).toEqual({ removed: true });
+      expect((await call()).json()).toEqual({ removed: false });
+    });
+
+    it("remembers the original message of a reply draft", async () => {
+      const cookie = await h.login();
+      const saved = (await draft(cookie, { mode: "reply", folder: "INBOX", uid: 1 })).json();
+      const opened = (await h.call("GET", `/api/drafts/open?uid=${saved.uid}`, { cookie })).json();
+      expect(opened).toMatchObject({ mode: "reply", folder: "INBOX", uid: 1 });
+      const stored = await h.gateway.getMessage("Drafts", saved.uid);
+      expect(stored?.inReplyTo).toBe("<orig-1@hotelpanorama.example>");
+    });
+
+    it("answers 404 for a missing draft and 422 for a message that is not one of ours", async () => {
+      const cookie = await h.login();
+      expect((await h.call("GET", "/api/drafts/open?uid=99", { cookie })).statusCode).toBe(404);
+      await h.gateway.appendMessage(
+        "Drafts",
+        Buffer.from("From: a@b.sk\r\nSubject: cudzí\r\n\r\ntext\r\n"),
+        ["\\Draft"],
+      );
+      const foreign = (await h.gateway.listMessages("Drafts"))[0];
+      expect(
+        (await h.call("GET", `/api/drafts/open?uid=${foreign?.uid}`, { cookie })).statusCode,
+      ).toBe(422);
+    });
+
+    it("requires login", async () => {
+      expect((await h.call("POST", "/api/drafts", { body: {} })).statusCode).toBe(401);
+      expect((await h.call("GET", "/api/drafts/open?uid=1")).statusCode).toBe(401);
     });
   });
 });

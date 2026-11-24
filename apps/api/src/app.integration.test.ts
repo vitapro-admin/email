@@ -90,6 +90,78 @@ describe.skipIf(!host)("API with a real mailserver", () => {
     expect(String(file.headers["content-disposition"])).toContain("attachment");
   });
 
+  it("saves a draft with an attachment, reopens it, and after sending delivers the file and removes the draft", async () => {
+    const subject = `Koncept s prílohou ${run}`;
+    const upload = await app.inject({
+      method: "POST",
+      url: `/api/uploads?name=${encodeURIComponent("cenník ť.txt")}`,
+      cookies: { aq_session: cookie },
+      headers: { "content-type": "application/octet-stream", "x-aq-client": "web" },
+      payload: Buffer.from("obsah prílohy"),
+    });
+    expect(upload.statusCode).toBe(200);
+    const file = upload.json();
+    const doc = [{ type: "paragraph", content: [{ type: "text", text: "Posielam cenník." }] }];
+
+    const saved = (
+      await call("POST", "/api/drafts", {
+        mode: "new",
+        to: "prijemca@aquapro.test",
+        cc: "",
+        bcc: "",
+        subject,
+        doc,
+        attachmentIds: [file.id],
+      })
+    ).json();
+    expect(saved.uid).toBeGreaterThan(0);
+    const inDrafts = (await call("GET", "/api/messages?folder=Drafts")).json() as {
+      uid: number;
+      subject: string;
+    }[];
+    expect(inDrafts.find((m) => m.subject === subject)?.uid).toBe(saved.uid);
+
+    const opened = (await call("GET", `/api/drafts/open?uid=${saved.uid}`)).json();
+    expect(opened.subject).toBe(subject);
+    expect(opened.doc).toEqual(doc);
+    expect(opened.attachments.map((a: { filename: string }) => a.filename)).toEqual([
+      "cenník ť.txt",
+    ]);
+
+    const sent = await call("POST", "/api/compose/send", {
+      mode: "new",
+      to: "prijemca@aquapro.test",
+      cc: "",
+      bcc: "",
+      subject,
+      doc,
+      attachmentIds: opened.attachments.map((a: { id: string }) => a.id),
+      draftUid: opened.draftUid,
+    });
+    expect(sent.statusCode).toBe(200);
+
+    const recipient = new ImapMailGateway({
+      host: host ?? "127.0.0.1",
+      port: 3143,
+      secure: false,
+      user: "prijemca",
+      password: "prijemca",
+      allowInvalidCertificates: true,
+    });
+    const arrived = (await recipient.listMessages("INBOX")).find((m) => m.subject === subject);
+    expect(arrived?.hasAttachments).toBe(true);
+    const detail = await recipient.getMessage("INBOX", arrived?.uid ?? 0);
+    expect(detail?.attachments.map((a) => a.filename)).toEqual(["cenník ť.txt"]);
+    expect((await recipient.getAttachment("INBOX", arrived?.uid ?? 0, 0))?.content.toString()).toBe(
+      "obsah prílohy",
+    );
+
+    const remaining = (await call("GET", "/api/messages?folder=Drafts")).json() as {
+      subject: string;
+    }[];
+    expect(remaining.find((m) => m.subject === subject)).toBeUndefined();
+  });
+
   it("sends a reply that is delivered with the quote and logo, and kept in Sent", async () => {
     const list = (await call("GET", "/api/messages?folder=INBOX")).json() as {
       uid: number;

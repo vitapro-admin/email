@@ -4,7 +4,15 @@ import { TopBar } from "./TopBar";
 import { ApiError, api } from "./api";
 import { Compose } from "./Compose";
 import type { ComposeTarget } from "./Compose";
-import { folderLabel, formatFull, formatShort, formatSize, personFull, personName } from "./format";
+import {
+  folderLabel,
+  formatFull,
+  formatShort,
+  formatSize,
+  isDraftsFolder,
+  personFull,
+  personName,
+} from "./format";
 import type { Folder, MessageSummary, MessageView, Profile } from "./types";
 
 interface Props {
@@ -85,6 +93,11 @@ export function MailApp({ user, theme, onToggleTheme, onLogout }: Props) {
       cancelled = true;
     };
   }, [folder, selected, images]);
+
+  const inDrafts = isDraftsFolder({
+    path: folder,
+    specialUse: folders.find((f) => f.path === folder)?.specialUse,
+  });
 
   const openFolder = (path: string) => {
     setFolder(path);
@@ -208,15 +221,27 @@ export function MailApp({ user, theme, onToggleTheme, onLogout }: Props) {
                     <dd>{formatFull(view.date)}</dd>
                   </dl>
                   <div className="reader-actions">
-                    <button type="button" onClick={() => startCompose("reply")}>
-                      Odpovedať
-                    </button>
-                    <button type="button" onClick={() => startCompose("replyAll")}>
-                      Odpovedať všetkým
-                    </button>
-                    <button type="button" onClick={() => startCompose("forward")}>
-                      Preposlať
-                    </button>
+                    {inDrafts ? (
+                      <button
+                        type="button"
+                        className="primary"
+                        onClick={() => setCompose({ mode: "new", draftUid: view.uid })}
+                      >
+                        Upraviť koncept
+                      </button>
+                    ) : (
+                      <>
+                        <button type="button" onClick={() => startCompose("reply")}>
+                          Odpovedať
+                        </button>
+                        <button type="button" onClick={() => startCompose("replyAll")}>
+                          Odpovedať všetkým
+                        </button>
+                        <button type="button" onClick={() => startCompose("forward")}>
+                          Preposlať
+                        </button>
+                      </>
+                    )}
                   </div>
                   {view.safety.suspiciousLinks > 0 && (
                     <div className="banner warn" role="alert">
@@ -259,9 +284,14 @@ export function MailApp({ user, theme, onToggleTheme, onLogout }: Props) {
       </div>
 
       {compose && (
-        <div className="overlay">
-          <Compose {...compose} onClose={() => setCompose(null)} onSent={sent} />
-        </div>
+        <Compose
+          {...compose}
+          onClose={() => {
+            setCompose(null);
+            void refresh();
+          }}
+          onSent={sent}
+        />
       )}
     </div>
   );

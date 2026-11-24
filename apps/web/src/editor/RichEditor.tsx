@@ -1,12 +1,15 @@
 import type { Doc } from "@aquapro/editor-schema";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
+import { docToEditor } from "./doc-to-editor";
 import { normalizeLink } from "./link";
 import { editorToDoc } from "./tiptap-to-doc";
 
 interface Props {
   onChange: (doc: Doc) => void;
   autoFocus?: boolean;
+  /** Content to start with, for example a saved draft. */
+  initialDoc?: Doc;
 }
 
 /**
@@ -14,7 +17,7 @@ interface Props {
  * lists, quotes, links and line breaks. There are no fonts, sizes or colors to choose, and pasted
  * content is reduced to this schema automatically.
  */
-export function RichEditor({ onChange, autoFocus }: Props) {
+export function RichEditor({ onChange, autoFocus, initialDoc }: Props) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -32,7 +35,7 @@ export function RichEditor({ onChange, autoFocus }: Props) {
         },
       }),
     ],
-    content: "",
+    content: initialDoc ? docToEditor(initialDoc) : "",
     autofocus: autoFocus ? "start" : false,
     shouldRerenderOnTransaction: true,
     editorProps: {

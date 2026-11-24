@@ -45,6 +45,14 @@ export class SessionStore {
     return session;
   }
 
+  /** True when the session exists and has not expired. Does not extend it. */
+  has(id: string): boolean {
+    const session = this.sessions.get(id);
+    if (!session) return false;
+    const now = this.now();
+    return now - session.lastSeen <= this.idleMs && now - session.createdAt <= this.maxMs;
+  }
+
   destroy(id: string | undefined): void {
     if (id) this.sessions.delete(id);
   }

@@ -118,6 +118,21 @@ export class ImapMailGateway implements MailGateway {
     });
   }
 
+  async deleteMessage(folder: string, uid: number): Promise<boolean> {
+    return this.withClient(async (client) => {
+      if (!(await folderExists(client, folder))) return false;
+      const lock = await client.getMailboxLock(folder);
+      try {
+        const found = await client.search({ uid: String(uid) }, { uid: true });
+        if (!found || found.length === 0) return false;
+        await client.messageDelete(String(uid), { uid: true });
+        return true;
+      } finally {
+        lock.release();
+      }
+    });
+  }
+
   async appendMessage(
     folder: string,
     raw: Buffer,

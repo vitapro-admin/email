@@ -1,5 +1,12 @@
 import type { Doc } from "@aquapro/editor-schema";
-import type { ComposeMode, Folder, MessageSummary, MessageView, Profile } from "./types";
+import type {
+  ComposeMode,
+  Folder,
+  MessageSummary,
+  MessageView,
+  Profile,
+  UploadedFile,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -11,7 +18,11 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(method: "GET" | "POST", url: string, body?: unknown): Promise<T> {
+async function request<T>(
+  method: "GET" | "POST" | "DELETE",
+  url: string,
+  body?: unknown,
+): Promise<T> {
   const response = await fetch(url, {
     method,
     credentials: "same-origin",
@@ -53,6 +64,21 @@ export interface ComposePayload {
   bcc: string;
   subject: string;
   doc: Doc;
+  attachmentIds: string[];
+  draftUid?: number;
+}
+
+export interface OpenedDraft {
+  mode: ComposeMode;
+  folder?: string;
+  uid?: number;
+  to: string;
+  cc: string;
+  bcc: string;
+  subject: string;
+  doc: Doc;
+  draftUid: number;
+  attachments: UploadedFile[];
 }
 
 export const api = {
@@ -66,7 +92,7 @@ export const api = {
   message: (folder: string, uid: number, images: boolean) =>
     request<MessageView>("GET", `/api/message?${query({ folder, uid, images: images ? 1 : 0 })}`),
   prepare: (mode: Exclude<ComposeMode, "new">, folder: string, uid: number) =>
-    request<{ to: string; cc: string; subject: string }>(
+    request<{ to: string; cc: string; subject: string; attachments: UploadedFile[] }>(
       "GET",
       `/api/compose/prepare?${query({ mode, folder, uid })}`,
     ),
@@ -74,6 +100,32 @@ export const api = {
     request<{ subject: string; html: string }>("POST", "/api/compose/preview", payload),
   send: (payload: ComposePayload) =>
     request<{ messageId: string; savedToSent: boolean }>("POST", "/api/compose/send", payload),
+  upload: async (file: File): Promise<UploadedFile> => {
+    const response = await fetch(`/api/uploads?${query({ name: file.name })}`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "X-AQ-Client": "web", "Content-Type": "application/octet-stream" },
+      body: file,
+    });
+    if (!response.ok) {
+      let message = "Prílohu sa nepodarilo nahrať.";
+      try {
+        message =
+          ((await response.json()) as { error?: { message?: string } }).error?.message ?? message;
+      } catch {
+        /* keep the generic message */
+      }
+      throw new ApiError(response.status, "upload", message);
+    }
+    return (await response.json()) as UploadedFile;
+  },
+  removeUpload: (id: string) =>
+    request<{ removed: boolean }>("DELETE", `/api/uploads/${encodeURIComponent(id)}`),
+  saveDraft: (payload: ComposePayload) =>
+    request<{ uid: number | null }>("POST", "/api/drafts", payload),
+  openDraft: (uid: number) => request<OpenedDraft>("GET", `/api/drafts/open?${query({ uid })}`),
+  deleteDraft: (uid: number) =>
+    request<{ removed: boolean }>("DELETE", `/api/drafts?${query({ uid })}`),
   attachmentUrl: (folder: string, uid: number, index: number) =>
     `/api/attachment?${query({ folder, uid, index })}`,
 };

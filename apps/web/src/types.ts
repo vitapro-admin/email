@@ -49,3 +49,10 @@ export interface MessageView {
 }
 
 export type ComposeMode = "new" | "reply" | "replyAll" | "forward";
+
+export interface UploadedFile {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+}

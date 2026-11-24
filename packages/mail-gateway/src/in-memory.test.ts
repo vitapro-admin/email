@@ -67,3 +67,26 @@ describe("InMemoryMailGateway: markSeen", () => {
     expect(await gateway.markSeen("INBOX", 99, true)).toBe(false);
   });
 });
+
+describe("InMemoryMailGateway: deleteMessage and attachments", () => {
+  it("deletes a message and reports unknown ones", async () => {
+    const gateway = new InMemoryMailGateway({ Drafts: [message(1), message(2)] });
+    expect(await gateway.deleteMessage("Drafts", 1)).toBe(true);
+    expect((await gateway.listMessages("Drafts")).map((m) => m.uid)).toEqual([2]);
+    expect(await gateway.deleteMessage("Drafts", 1)).toBe(false);
+    expect(await gateway.deleteMessage("Nic", 1)).toBe(false);
+  });
+
+  it("returns seeded attachment bodies", async () => {
+    const gateway = new InMemoryMailGateway(
+      {
+        INBOX: [
+          message(1, { attachments: [{ filename: "a.txt", contentType: "text/plain", size: 3 }] }),
+        ],
+      },
+      { "INBOX/1": [Buffer.from("abc")] },
+    );
+    expect((await gateway.getAttachment("INBOX", 1, 0))?.content.toString()).toBe("abc");
+    expect(await gateway.getAttachment("INBOX", 1, 1)).toBeNull();
+  });
+});

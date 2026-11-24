@@ -38,8 +38,22 @@ const FOLDER_LABELS: Record<NonNullable<Folder["specialUse"]>, string> = {
   archive: "Archív",
 };
 
+const BY_NAME: [RegExp, string][] = [
+  [/^inbox$/i, "Doručená pošta"],
+  [/^drafts?$/i, "Koncepty"],
+  [/^sent( items| messages)?$/i, "Odoslané"],
+  [/^(trash|deleted items)$/i, "Kôš"],
+  [/^(junk|spam)$/i, "Spam"],
+];
+
+/** Folders the server does not mark with a role still get a Slovak name when their name is usual. */
 export const folderLabel = (f: Folder): string =>
-  (f.specialUse && FOLDER_LABELS[f.specialUse]) || f.name;
+  (f.specialUse && FOLDER_LABELS[f.specialUse]) ||
+  BY_NAME.find(([pattern]) => pattern.test(f.name))?.[1] ||
+  f.name;
+
+export const isDraftsFolder = (f: { specialUse?: string; path: string }): boolean =>
+  f.specialUse === "drafts" || /^drafts?$/i.test(f.path);
 
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

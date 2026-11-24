@@ -258,6 +258,118 @@ async function main() {
       .getByRole("button", { name: new RegExp(`Test druhého okna ${run}`) })
       .waitFor({ timeout: 15_000 });
 
+    step("koncept a príloha: pripojenie súboru, zákaz .exe, automatické uloženie");
+    const draftSubject = `Koncept ${run}`;
+    await page.getByRole("button", { name: "Nová správa" }).first().click();
+    const draftDialog = page.getByRole("region", { name: "Nová správa" });
+    await draftDialog.getByLabel("Komu").fill("prijemca@aquapro.test");
+    await draftDialog.getByLabel("Predmet").fill(draftSubject);
+    await draftDialog.getByRole("textbox", { name: "Text správy" }).click();
+    await page.keyboard.type("Rozpísaná správa s prílohou.");
+    await draftDialog.getByLabel("Vybrať súbory").setInputFiles({
+      name: "cenník ť.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("obsah prílohy"),
+    });
+    await draftDialog.getByRole("list", { name: "Prílohy" }).getByText("cenník ť.txt").waitFor();
+    await draftDialog.getByLabel("Vybrať súbory").setInputFiles({
+      name: "program.exe",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("MZ"),
+    });
+    await draftDialog.getByText(/bezpečnostných dôvodov/).waitFor();
+    assert.equal(
+      await draftDialog.getByRole("list", { name: "Prílohy" }).getByRole("listitem").count(),
+      1,
+    );
+    await screenshot(page, "09-priloha");
+    await draftDialog.getByText(/Koncept uložený o/).waitFor({ timeout: 25_000 }); // automatic saving after about 15 s
+
+    step("zatvorenie: otázka, pokračovanie, uloženie ako koncept");
+    await draftDialog.getByRole("button", { name: "Zavrieť" }).click();
+    const ask = page.getByRole("alertdialog");
+    await ask.getByText("Správa nie je odoslaná").waitFor();
+    await screenshot(page, "10-zatvorenie");
+    await ask.getByRole("button", { name: "Pokračovať v písaní" }).click();
+    await ask.waitFor({ state: "detached" });
+    assert.match(await draftDialog.getByLabel("Predmet").inputValue(), new RegExp(draftSubject));
+    await page.keyboard.press("Escape"); // Escape asks as well
+    await ask.waitFor();
+    await ask.getByRole("button", { name: "Uložiť ako koncept" }).click();
+    await draftDialog.waitFor({ state: "detached" });
+
+    step("koncept sa dá znova otvoriť a ostane v ňom všetko");
+    await page.getByRole("button", { name: /Koncepty/ }).click();
+    await page.getByRole("button", { name: new RegExp(draftSubject) }).click();
+    await page.getByRole("button", { name: "Upraviť koncept" }).click();
+    const reopened = page.getByRole("region", { name: "Nová správa" });
+    await page.waitForFunction(() =>
+      (document.getElementById("subject") as HTMLInputElement | null)?.value.startsWith("Koncept"),
+    );
+    assert.equal(await reopened.getByLabel("Komu").inputValue(), "prijemca@aquapro.test");
+    await reopened.getByText("Rozpísaná správa s prílohou.").waitFor();
+    await reopened.getByRole("list", { name: "Prílohy" }).getByText("cenník ť.txt").waitFor();
+
+    step("odoslanie konceptu: príloha dorazí a koncept zmizne");
+    await reopened.getByRole("button", { name: "Odoslať" }).click();
+    await page.getByText("Správa bola odoslaná.").waitFor();
+    let withFile;
+    for (let i = 0; i < 20 && !withFile; i++) {
+      withFile = (await recipient.listMessages("INBOX")).find((m) => m.subject === draftSubject);
+      if (!withFile) await sleep(250);
+    }
+    assert.ok(withFile?.hasAttachments, "správa dorazila bez prílohy");
+    const delivered = await recipient.getAttachment("INBOX", withFile.uid, 0);
+    assert.equal(delivered?.filename, "cenník ť.txt");
+    assert.equal(delivered?.content.toString(), "obsah prílohy");
+    await page.getByRole("button", { name: /Koncepty/ }).click();
+    await page.waitForTimeout(500);
+    assert.equal(
+      await page.getByRole("button", { name: new RegExp(draftSubject) }).count(),
+      0,
+      "koncept mal po odoslaní zmiznúť",
+    );
+
+    step("zahodenie rozpísanej správy nenechá žiadny koncept");
+    await page.getByRole("button", { name: "Nová správa" }).first().click();
+    const throwaway = page.getByRole("region", { name: "Nová správa" });
+    await throwaway.getByLabel("Predmet").fill(`Zahodiť ${run}`);
+    await throwaway.getByRole("textbox", { name: "Text správy" }).click();
+    await page.keyboard.type("Toto sa nemá uložiť.");
+    await throwaway.getByRole("button", { name: "Zavrieť" }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: "Zahodiť" }).click();
+    await throwaway.waitFor({ state: "detached" });
+    await page.waitForTimeout(500);
+    assert.equal(await page.getByRole("button", { name: new RegExp(`Zahodiť ${run}`) }).count(), 0);
+
+    step("prázdne okno sa zatvorí bez otázky");
+    await page.getByRole("button", { name: "Nová správa" }).first().click();
+    await page
+      .getByRole("region", { name: "Nová správa" })
+      .getByRole("button", { name: "Zavrieť" })
+      .click();
+    await page.getByRole("region", { name: "Nová správa" }).waitFor({ state: "detached" });
+
+    step("preposlanie prinesie pôvodné prílohy a dajú sa odstrániť");
+    await page.getByRole("button", { name: /Doručená pošta/ }).click();
+    await page.getByRole("button", { name: new RegExp(`Reklamácia ${run}`) }).click();
+    await page.getByRole("button", { name: "Preposlať" }).click();
+    const forward = page.getByRole("region", { name: "Preposlanie" });
+    await forward.getByRole("list", { name: "Prílohy" }).getByText("foto.txt").waitFor();
+    await forward.getByRole("button", { name: "Odstrániť prílohu foto.txt" }).click();
+    await forward.getByRole("list", { name: "Prílohy" }).waitFor({ state: "detached" });
+    // Nothing meaningful is left in the message, so closing needs no question.
+    await forward.getByRole("button", { name: "Zavrieť" }).click();
+    await forward.waitFor({ state: "detached" });
+    assert.equal(await page.getByRole("alertdialog").count(), 0);
+
+    step("v ľavom paneli je viditeľné práve jedno logo (svetlá aj tmavá téma)");
+    assert.equal(await page.locator(".sidebar-logo:visible").count(), 1);
+    await page.getByRole("button", { name: "Prepnúť na tmavú tému" }).click();
+    assert.equal(await page.locator(".sidebar-logo:visible").count(), 1);
+    await page.getByRole("button", { name: "Prepnúť na svetlú tému" }).click();
+    assert.equal(await page.locator(".sidebar-logo:visible").count(), 1);
+
     step("odhlásenie");
     await page.getByRole("button", { name: "Prepnúť na tmavú tému" }).click();
     await screenshot(page, "07-tmava-tema");

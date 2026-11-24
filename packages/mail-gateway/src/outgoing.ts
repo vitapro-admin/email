@@ -68,7 +68,7 @@ export const OUTGOING_LIMITS = {
   references: 20,
 } as const;
 
-const EMAIL = /^[^\s@<>"',;()[\]\\]+@[^\s@<>"',;()[\]\\]+\.[^\s@<>"',;()[\]\\]{2,}$/;
+export const EMAIL = /^[^\s@<>"',;()[\]\\]+@[^\s@<>"',;()[\]\\]+\.[^\s@<>"',;()[\]\\]{2,}$/;
 const LINE_BREAK = new RegExp(
   `[\\r\\n${String.fromCharCode(0x2028)}${String.fromCharCode(0x2029)}${String.fromCharCode(0)}]`,
 );

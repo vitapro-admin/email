@@ -124,6 +124,32 @@ describe.skipIf(!host)("ImapMailGateway (real server)", () => {
     expect(await gateway.markSeen("INBOX", 999999, true)).toBe(false);
   });
 
+  it("saves a draft with an attachment, finds it again and deletes it", async () => {
+    const raw = Buffer.from(
+      [
+        "From: podpora <integracia@aquapro.test>",
+        "To: someone@klient.example",
+        `Subject: Koncept ${run}`,
+        "MIME-Version: 1.0",
+        'Content-Type: text/plain; charset="utf-8"',
+        "",
+        "Rozpísaný text.",
+        "",
+      ].join("\r\n"),
+    );
+    const saved = await gateway.appendMessage("Drafts", raw, ["\\Draft", "\\Seen"]);
+    expect(saved.uid).toBeGreaterThan(0);
+    const found = (await gateway.listMessages("Drafts")).find(
+      (m) => m.subject === `Koncept ${run}`,
+    );
+    expect(found?.uid).toBe(saved.uid);
+    expect(await gateway.deleteMessage("Drafts", saved.uid ?? 0)).toBe(true);
+    expect(
+      (await gateway.listMessages("Drafts")).find((m) => m.subject === `Koncept ${run}`),
+    ).toBeUndefined();
+    expect(await gateway.deleteMessage("Drafts", saved.uid ?? 0)).toBe(false);
+  });
+
   it("returns null for a missing message or folder", async () => {
     expect(await gateway.getMessage("INBOX", 999999)).toBeNull();
     expect(await gateway.getMessage("Neexistuje", 1)).toBeNull();

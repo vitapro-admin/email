@@ -2,13 +2,21 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import fastifyCookie from "@fastify/cookie";
 import fastifyStatic from "@fastify/static";
-import { ImapMailGateway, OutgoingMessageError, SmtpMailSender } from "@aquapro/mail-gateway";
+import { docToPlainText, sanitizeDoc } from "@aquapro/editor-schema";
+import {
+  ImapMailGateway,
+  OutgoingMessageError,
+  SmtpMailSender,
+  buildDraftRaw,
+} from "@aquapro/mail-gateway";
 import type { MailGateway, MailSender } from "@aquapro/mail-gateway";
 import Fastify from "fastify";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 import { parseAddressList } from "./address.js";
 import { ComposeError, prepareCompose, renderCompose, toOutgoing } from "./compose.js";
+import { DRAFT_STATE_FILENAME, draftsFolder, parseDraftState } from "./drafts.js";
+import { UPLOAD_LIMITS, UploadError, UploadStore, toView } from "./uploads.js";
 import type { ComposeMode } from "./compose.js";
 import { loadConfig } from "./config.js";
 import type { AppConfig } from "./config.js";
@@ -45,6 +53,8 @@ const composeBody = z.object({
   bcc: z.string().max(5000).default(""),
   subject: z.string().max(998),
   doc: z.unknown(),
+  attachmentIds: z.array(z.string().max(60)).max(UPLOAD_LIMITS.files).default([]),
+  draftUid: z.number().int().positive().optional(),
 });
 
 const prepareQuery = z.object({
@@ -110,6 +120,7 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
     });
 
   const sessions = new SessionStore(config.sessionIdleMs, config.sessionMaxMs, now);
+  const uploads = new UploadStore(now);
   const loginLimiter = new AttemptLimiter(5, 5 * 60_000, now);
   const ipLimiter = new AttemptLimiter(30, 5 * 60_000, now);
 
@@ -120,9 +131,18 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
     bodyLimit: 5 * 1024 * 1024,
   });
   await app.register(fastifyCookie);
+  // Attachments arrive as raw bytes (the file itself), not as a form.
+  app.addContentTypeParser(
+    "application/octet-stream",
+    { parseAs: "buffer", bodyLimit: UPLOAD_LIMITS.totalBytes + 4096 },
+    (_req, body, done) => done(null, body),
+  );
   app.decorateRequest("authSession", undefined);
 
-  const sweeper = setInterval(() => sessions.sweep(), 60_000);
+  const sweeper = setInterval(() => {
+    sessions.sweep();
+    uploads.sweep((id) => sessions.has(id));
+  }, 60_000);
   sweeper.unref();
   app.addHook("onClose", async () => clearInterval(sweeper));
 
@@ -212,6 +232,11 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
 
   // ---- mail
   const mailError = (reply: FastifyReply, error: unknown) => {
+    if (error instanceof UploadError) {
+      return reply
+        .code(error.code === "attachments-too-large" ? 413 : 400)
+        .send(errorBody(error.code, error.message));
+    }
     if (error instanceof OutgoingMessageError || error instanceof ComposeError) {
       return reply.code(400).send(errorBody(error.code, error.message));
     }
@@ -306,9 +331,19 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
     if (!q.success) return reply.code(400).send(errorBody("invalid-request", "Neplatné údaje."));
     try {
       const s = session(req);
-      const original = await createGateway(s).getMessage(q.data.folder, q.data.uid);
+      const gateway = createGateway(s);
+      const original = await gateway.getMessage(q.data.folder, q.data.uid);
       if (!original) return reply.code(404).send(errorBody("not-found", "Správa neexistuje."));
-      return prepareCompose(q.data.mode, original, s.profile.email);
+      const defaults = prepareCompose(q.data.mode, original, s.profile.email);
+      // A forward carries the original attachments. They become normal attachments the user can remove.
+      const attachments = [];
+      if (q.data.mode === "forward") {
+        for (let index = 0; index < original.attachments.length; index++) {
+          const file = await gateway.getAttachment(q.data.folder, q.data.uid, index);
+          if (file) attachments.push(toView(uploads.add(s.id, file.filename, file.content)));
+        }
+      }
+      return { ...defaults, attachments };
     } catch (error) {
       return mailError(reply, error);
     }
@@ -376,7 +411,23 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
         cc: parseAddressList(ctx.b.cc),
         bcc: parseAddressList(ctx.b.bcc),
       });
+      const files = ctx.b.attachmentIds.map((id) => uploads.get(ctx.s.id, id));
+      if (files.some((f) => f === undefined)) {
+        return reply
+          .code(400)
+          .send(
+            errorBody(
+              "attachment-missing",
+              "Niektorá príloha už nie je dostupná. Pripojte ju znova.",
+            ),
+          );
+      }
+      const attachments = files.flatMap((f) =>
+        f ? [{ filename: f.filename, content: f.content, contentType: f.contentType }] : [],
+      );
+      if (attachments.length) outgoing.attachments = attachments;
       const sent = await createSender(ctx.s).send(outgoing);
+      for (const id of ctx.b.attachmentIds) uploads.remove(ctx.s.id, id);
 
       // The message is sent. Saving the copy must never turn that into an error for the user.
       let savedToSent = false;
@@ -385,10 +436,132 @@ export async function buildApp(deps: AppDeps = {}): Promise<FastifyInstance> {
         const sentFolder = folders.find((f) => f.specialUse === "sent")?.path ?? "Sent";
         await ctx.gateway.appendMessage(sentFolder, sent.raw, ["\\Seen"]);
         savedToSent = true;
+        if (ctx.b.draftUid)
+          await ctx.gateway.deleteMessage(await draftsFolder(ctx.gateway), ctx.b.draftUid);
       } catch (error) {
         req.log.warn({ err: error }, "could not save a copy to Sent");
       }
       return { messageId: sent.messageId, savedToSent };
+    } catch (error) {
+      return mailError(reply, error);
+    }
+  });
+
+  // ---- attachments (files waiting to be sent)
+  app.post("/api/uploads", { bodyLimit: UPLOAD_LIMITS.totalBytes + 4096 }, async (req, reply) => {
+    const q = z.object({ name: z.string().min(1).max(300) }).safeParse(req.query);
+    if (!q.success || !Buffer.isBuffer(req.body)) {
+      return reply.code(400).send(errorBody("invalid-request", "Neplatné údaje."));
+    }
+    try {
+      return toView(uploads.add(session(req).id, q.data.name, req.body));
+    } catch (error) {
+      return mailError(reply, error);
+    }
+  });
+
+  app.delete("/api/uploads/:id", async (req, reply) => {
+    const params = z.object({ id: z.string().min(1).max(60) }).safeParse(req.params);
+    if (!params.success)
+      return reply.code(400).send(errorBody("invalid-request", "Neplatné údaje."));
+    return { removed: uploads.remove(session(req).id, params.data.id) };
+  });
+
+  // ---- drafts (stored in the mailbox's Drafts folder)
+  app.post("/api/drafts", async (req, reply) => {
+    const parsed = composeBody.safeParse(req.body);
+    if (!parsed.success)
+      return reply.code(400).send(errorBody("invalid-request", "Neplatné údaje."));
+    const b = parsed.data;
+    const s = session(req);
+    try {
+      const gateway = createGateway(s);
+      const files = b.attachmentIds.map((id) => uploads.get(s.id, id));
+      if (files.some((f) => f === undefined)) {
+        return reply
+          .code(400)
+          .send(errorBody("attachment-missing", "Niektorá príloha už nie je dostupná."));
+      }
+      const doc = sanitizeDoc(b.doc);
+      let inReplyTo: string | undefined;
+      let references: string[] | undefined;
+      if (b.mode === "reply" || b.mode === "replyAll") {
+        const original = b.folder && b.uid ? await gateway.getMessage(b.folder, b.uid) : null;
+        if (original) {
+          inReplyTo = original.messageId;
+          references = [...original.references, original.messageId];
+        }
+      }
+      const raw = await buildDraftRaw({
+        from: { name: s.profile.name, email: s.profile.email },
+        to: parseAddressList(b.to),
+        subject: b.subject,
+        text: docToPlainText(doc),
+        inReplyTo,
+        references,
+        state: {
+          v: 1,
+          mode: b.mode,
+          folder: b.folder,
+          uid: b.uid,
+          to: b.to,
+          cc: b.cc,
+          bcc: b.bcc,
+          subject: b.subject,
+          doc,
+        },
+        attachments: files.flatMap((f) =>
+          f ? [{ filename: f.filename, content: f.content, contentType: f.contentType }] : [],
+        ),
+      });
+      const folder = await draftsFolder(gateway);
+      const saved = await gateway.appendMessage(folder, raw, ["\\Draft", "\\Seen"]);
+      // The new version is safely stored; only now remove the previous one.
+      if (b.draftUid && b.draftUid !== saved.uid) await gateway.deleteMessage(folder, b.draftUid);
+      return { uid: saved.uid ?? null };
+    } catch (error) {
+      return mailError(reply, error);
+    }
+  });
+
+  app.get("/api/drafts/open", async (req, reply) => {
+    const q = z.object({ uid: z.coerce.number().int().positive() }).safeParse(req.query);
+    if (!q.success) return reply.code(400).send(errorBody("invalid-request", "Neplatné údaje."));
+    const s = session(req);
+    try {
+      const gateway = createGateway(s);
+      const folder = await draftsFolder(gateway);
+      const detail = await gateway.getMessage(folder, q.data.uid);
+      if (!detail) return reply.code(404).send(errorBody("not-found", "Koncept neexistuje."));
+      const stateIndex = detail.attachments.findIndex((a) => a.filename === DRAFT_STATE_FILENAME);
+      const stateFile =
+        stateIndex >= 0 ? await gateway.getAttachment(folder, q.data.uid, stateIndex) : null;
+      const state = stateFile
+        ? parseDraftState(JSON.parse(stateFile.content.toString("utf8")))
+        : undefined;
+      if (!state)
+        return reply
+          .code(422)
+          .send(errorBody("not-our-draft", "Tento koncept nebol vytvorený v tejto aplikácii."));
+
+      const attachments = [];
+      for (let index = 0; index < detail.attachments.length; index++) {
+        if (index === stateIndex) continue;
+        const file = await gateway.getAttachment(folder, q.data.uid, index);
+        if (file) attachments.push(toView(uploads.add(s.id, file.filename, file.content)));
+      }
+      return { ...state, draftUid: q.data.uid, attachments };
+    } catch (error) {
+      return mailError(reply, error);
+    }
+  });
+
+  app.delete("/api/drafts", async (req, reply) => {
+    const q = z.object({ uid: z.coerce.number().int().positive() }).safeParse(req.query);
+    if (!q.success) return reply.code(400).send(errorBody("invalid-request", "Neplatné údaje."));
+    try {
+      const gateway = createGateway(session(req));
+      return { removed: await gateway.deleteMessage(await draftsFolder(gateway), q.data.uid) };
     } catch (error) {
       return mailError(reply, error);
     }

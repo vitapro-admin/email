@@ -2,9 +2,9 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { ApiError, api } from "./api";
 import { Logo } from "./Logo";
-import type { Profile } from "./types";
+import type { Me } from "./types";
 
-export function Login({ onLoggedIn }: { onLoggedIn: (user: Profile) => void }) {
+export function Login({ onLoggedIn }: { onLoggedIn: (me: Me) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -15,8 +15,7 @@ export function Login({ onLoggedIn }: { onLoggedIn: (user: Profile) => void }) {
     setError(null);
     setBusy(true);
     try {
-      const { user } = await api.login(username.trim(), password);
-      onLoggedIn(user);
+      onLoggedIn(await api.login(username.trim(), password));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Prihlásenie sa nepodarilo.");
       setBusy(false);

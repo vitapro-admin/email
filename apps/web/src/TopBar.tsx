@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { photoUrl } from "./api";
 import type { Profile } from "./types";
 
 interface Props {
@@ -6,6 +7,7 @@ interface Props {
   theme: "light" | "dark";
   onToggleTheme: () => void;
   onLogout: () => void;
+  onOpenAdmin?: () => void;
 }
 
 const initials = (name: string): string =>
@@ -15,6 +17,18 @@ const initials = (name: string): string =>
     .slice(0, 2)
     .map((part) => part.charAt(0).toUpperCase())
     .join("") || "?";
+
+/** Photo from the directory, or initials when there is none. */
+export function Avatar({ user, size }: { user: Profile; size?: "large" }) {
+  const cls = size === "large" ? "avatar avatar-large" : "avatar";
+  return user.hasPhoto && user.id !== undefined ? (
+    <img className={cls} src={photoUrl(user.id)} alt="" />
+  ) : (
+    <span className={cls} aria-hidden="true">
+      {initials(user.name)}
+    </span>
+  );
+}
 
 function ThemeIcon({ theme }: { theme: "light" | "dark" }) {
   // Shows what a click switches TO: a moon in the light theme, a sun in the dark one.
@@ -50,7 +64,7 @@ function ThemeIcon({ theme }: { theme: "light" | "dark" }) {
 }
 
 /** Bar above the message list and reader: theme switch and the signed-in user with their menu. */
-export function TopBar({ user, theme, onToggleTheme, onLogout }: Props) {
+export function TopBar({ user, theme, onToggleTheme, onLogout, onOpenAdmin }: Props) {
   const [open, setOpen] = useState(false);
   const wrapper = useRef<HTMLDivElement>(null);
 
@@ -92,9 +106,7 @@ export function TopBar({ user, theme, onToggleTheme, onLogout }: Props) {
           aria-label={`Účet: ${user.name}`}
           onClick={() => setOpen((v) => !v)}
         >
-          <span className="avatar" aria-hidden="true">
-            {initials(user.name)}
-          </span>
+          <Avatar user={user} />
           <span className="user-name">{user.name}</span>
           <span className="chevron" aria-hidden="true">
             ▾
@@ -106,6 +118,19 @@ export function TopBar({ user, theme, onToggleTheme, onLogout }: Props) {
               <strong>{user.name}</strong>
               <span>{user.email}</span>
             </div>
+            {onOpenAdmin && (
+              <button
+                type="button"
+                role="menuitem"
+                className="menu-item"
+                onClick={() => {
+                  setOpen(false);
+                  onOpenAdmin();
+                }}
+              >
+                Správa
+              </button>
+            )}
             <button type="button" role="menuitem" className="menu-item" onClick={onLogout}>
               Odhlásiť
             </button>

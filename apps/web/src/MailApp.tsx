@@ -20,9 +20,10 @@ interface Props {
   theme: "light" | "dark";
   onToggleTheme: () => void;
   onLogout: () => void;
+  onOpenAdmin?: () => void;
 }
 
-export function MailApp({ user, theme, onToggleTheme, onLogout }: Props) {
+export function MailApp({ user, theme, onToggleTheme, onLogout, onOpenAdmin }: Props) {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [folder, setFolder] = useState("INBOX");
   const [messages, setMessages] = useState<MessageSummary[]>([]);
@@ -153,7 +154,13 @@ export function MailApp({ user, theme, onToggleTheme, onLogout }: Props) {
       </aside>
 
       <div className="main">
-        <TopBar user={user} theme={theme} onToggleTheme={onToggleTheme} onLogout={onLogout} />
+        <TopBar
+          user={user}
+          theme={theme}
+          onToggleTheme={onToggleTheme}
+          onLogout={onLogout}
+          {...(onOpenAdmin ? { onOpenAdmin } : {})}
+        />
         <div className="content">
           <section className="list" aria-label="Správy">
             {listError && (

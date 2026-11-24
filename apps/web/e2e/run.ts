@@ -12,9 +12,12 @@ import { mkdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
+import { createPool, migrate } from "@aquapro/db";
+import type { Db } from "@aquapro/db";
+import { Directory } from "@aquapro/directory";
 import { ImapMailGateway, SmtpMailSender } from "@aquapro/mail-gateway";
 import { chromium } from "playwright";
-import type { Page } from "playwright";
+import type { Browser, Page } from "playwright";
 
 const here = fileURLToPath(new URL(".", import.meta.url));
 const webDir = resolve(here, "..");
@@ -29,7 +32,48 @@ const screenshot = async (page: Page, name: string) => {
   if (shots) await page.screenshot({ path: resolve(shots, `${name}.png`) });
 };
 
-async function startApi(): Promise<ChildProcess> {
+// With a database the app runs with the user directory and the administration is tested too.
+// Without one the development login is used and the administration step is skipped.
+const dbUrl = process.env["E2E_DATABASE_URL"] ?? process.env["TEST_DATABASE_URL"];
+const schema = `e2e_${run}`;
+let adminDb: Db | undefined;
+
+async function prepareDirectory(): Promise<string | undefined> {
+  if (!dbUrl) return undefined;
+  adminDb = createPool({ databaseUrl: dbUrl, searchPath: schema });
+  await adminDb.query(`create schema ${schema}`);
+  await migrate(adminDb);
+  const directory = new Directory(adminDb);
+  const boss = await directory.createFirstSuperadmin({
+    login: "podpora",
+    email: "podpora@aquapro.test",
+    firstName: "Peter",
+    lastName: "Správca",
+    position: "Superadmin",
+  });
+  const access = await directory.getAccess(boss.id);
+  if (!access) throw new Error("Superadmin sa nenačítal.");
+  const roles = await directory.listRoles();
+  const roleId = (key: string) => roles.find((r) => r.key === key)?.id ?? 0;
+  await directory.createUser(access, {
+    login: "ivana",
+    email: "ivana@aquapro.test",
+    firstName: "Ivana",
+    lastName: "Test",
+    position: "Podpora obchodu",
+    roleIds: [roleId("podpora_obchodu")],
+  });
+  await directory.createUser(access, {
+    login: "prijemca",
+    email: "prijemca@aquapro.test",
+    firstName: "Zuzana",
+    lastName: "Obchodná",
+    roleIds: [roleId("obchod")],
+  });
+  return `${dbUrl}${dbUrl.includes("?") ? "&" : "?"}options=-c%20search_path%3D${schema}`;
+}
+
+async function startApi(databaseUrl: string | undefined): Promise<ChildProcess> {
   const child = spawn(
     process.execPath,
     ["--import", "tsx", resolve(webDir, "../api/src/server.ts")],
@@ -40,6 +84,7 @@ async function startApi(): Promise<ChildProcess> {
         PORT: String(PORT),
         WEB_DIST: resolve(webDir, "dist"),
         NODE_ENV: "development",
+        ...(databaseUrl ? { DATABASE_URL: databaseUrl } : { DATABASE_URL: "" }),
       },
       stdio: ["ignore", "ignore", "inherit"],
     },
@@ -80,12 +125,98 @@ async function waitForMailserver() {
 const smtp = (from: { name: string; email: string }) =>
   new SmtpMailSender({ host: "127.0.0.1", port: 3025, secure: false, requireTls: false, from });
 
+async function adminScenario(browser: Browser, pageErrors: string[]) {
+  step("správa: bežný používateľ nevidí položku Správa");
+  const staffContext = await browser.newContext({ viewport: { width: 1360, height: 860 } });
+  const staff = await staffContext.newPage();
+  staff.on("pageerror", (e) => pageErrors.push(e.message));
+  await staff.goto(BASE);
+  await staff.getByLabel("Meno").fill("ivana");
+  await staff.getByLabel("Heslo").fill("ivana");
+  await staff.getByRole("button", { name: "Prihlásiť" }).click();
+  await staff.getByRole("button", { name: "Nová správa" }).waitFor();
+  await staff.getByRole("button", { name: /^Účet:/ }).click();
+  await staff.getByRole("menuitem", { name: "Odhlásiť" }).waitFor();
+  assert.equal(await staff.getByRole("menuitem", { name: "Správa" }).count(), 0);
+  const forbidden = await staffContext.request.get(`${BASE}/api/admin/users`);
+  assert.equal(forbidden.status(), 403);
+  await staffContext.close();
+
+  step("správa: superadmin sa prihlási a otvorí Správu");
+  const context = await browser.newContext({ viewport: { width: 1360, height: 860 } });
+  const page = await context.newPage();
+  page.on("pageerror", (e) => pageErrors.push(e.message));
+  await page.goto(BASE);
+  await page.getByLabel("Meno").fill("podpora");
+  await page.getByLabel("Heslo").fill("podpora");
+  await page.getByRole("button", { name: "Prihlásiť" }).click();
+  await page.getByRole("button", { name: "Nová správa" }).waitFor();
+  await page.getByRole("button", { name: /^Účet:/ }).click();
+  await page.getByRole("menuitem", { name: "Správa" }).click();
+  await page.getByRole("heading", { name: "Používatelia" }).waitFor();
+  await page.getByRole("button", { name: /Ivana Test/ }).waitFor();
+  await screenshot(page, "09-sprava-pouzivatelia");
+
+  step("správa: vytvorenie používateľa, duplicita sa odmietne");
+  const createUser = async () => {
+    await page.getByRole("button", { name: "Nový používateľ" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Prihlasovacie meno").fill("marek");
+    await dialog.getByLabel("E-mail", { exact: true }).fill("marek@aquapro.test");
+    await dialog.getByLabel("Meno", { exact: true }).fill("Marek");
+    await dialog.getByLabel("Priezvisko").fill("Servisný");
+    await dialog.getByLabel("Titul pred menom").fill("Ing.");
+    await dialog.getByLabel("Servis", { exact: true }).check();
+    await dialog.getByRole("button", { name: "Vytvoriť" }).click();
+    return dialog;
+  };
+  await createUser();
+  await page.getByRole("button", { name: /Ing\. Marek Servisný/ }).waitFor();
+  const duplicate = await createUser();
+  await duplicate.getByRole("alert").filter({ hasText: "už existuje" }).waitFor();
+  await duplicate.getByRole("button", { name: "Zavrieť", exact: true }).click();
+
+  step("správa: zablokovanie a odblokovanie účtu");
+  await page.getByRole("button", { name: /Ing\. Marek Servisný/ }).click();
+  await page.getByRole("button", { name: "Zablokovať účet" }).click();
+  await page.getByRole("button", { name: "Odblokovať účet" }).waitFor();
+  await page.getByRole("dialog").getByRole("button", { name: "Zavrieť", exact: true }).click();
+  await page.getByText("Zablokovaný", { exact: true }).waitFor();
+
+  step("správa: roly, zoznamy a záznam zmien");
+  await page.getByRole("button", { name: "Roly" }).click();
+  await page.getByRole("button", { name: /Superadmin/ }).click();
+  await page.getByText("Superadmin má vždy všetky oprávnenia").waitFor();
+  await page.getByRole("button", { name: "Nová rola" }).click();
+  await page.getByLabel("Názov").fill("Šéf skladu");
+  await page.getByLabel("Distribúcia a trasy").check();
+  await page.getByRole("button", { name: "Vytvoriť" }).click();
+  await page.getByText("Uložené.").waitFor();
+  await screenshot(page, "10-sprava-roly");
+
+  await page.getByRole("button", { name: "Zoznamy" }).click();
+  await page.getByLabel("Nová položka: Oddelenia").fill("Servis");
+  await page.getByRole("button", { name: "Pridať" }).first().click();
+  await page.getByRole("listitem").filter({ hasText: "Servis" }).waitFor();
+
+  await page.getByRole("button", { name: "Záznam zmien" }).click();
+  await page.getByRole("cell", { name: "Vytvorená rola" }).waitFor();
+  await page.getByRole("cell", { name: "Zablokovaný účet" }).waitFor();
+  await screenshot(page, "11-sprava-zaznam");
+
+  step("správa: späť do pošty");
+  await page.getByRole("button", { name: "← Späť do pošty" }).click();
+  await page.getByRole("button", { name: "Nová správa" }).waitFor();
+  await context.close();
+}
+
 async function main() {
   await waitForMailserver();
   // E2E_CHROMIUM lets you point to an already installed Chromium instead of the Playwright download.
   const executablePath = process.env["E2E_CHROMIUM"];
   const browser = await chromium.launch(executablePath ? { executablePath } : {});
-  const api = await startApi().catch(async (error: unknown) => {
+  const databaseUrl = await prepareDirectory();
+  const api = await startApi(databaseUrl).catch(async (error: unknown) => {
     await browser.close();
     throw error;
   });
@@ -382,11 +513,18 @@ async function main() {
     const afterLogout = await context.request.get(`${BASE}/api/folders`);
     assert.equal(afterLogout.status(), 401);
 
+    if (databaseUrl) await adminScenario(browser, pageErrors);
+    else step("správa používateľov sa preskočila (nie je nastavená E2E_DATABASE_URL)");
+
     assert.deepEqual(pageErrors, [], `chyby v prehliadači: ${pageErrors.join("; ")}`);
     console.log("\n✔ E2E test prešiel.");
   } finally {
     await browser.close();
     api.kill();
+    if (adminDb) {
+      await adminDb.query(`drop schema if exists ${schema} cascade`).catch(() => undefined);
+      await adminDb.end().catch(() => undefined);
+    }
   }
 }
 

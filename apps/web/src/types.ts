@@ -5,10 +5,90 @@ export interface Address {
 }
 
 export interface Profile {
+  id?: number;
   name: string;
   role: string;
   email: string;
+  phone?: string;
+  landline?: string;
+  hasPhoto?: boolean;
 }
+
+/** The signed-in person with what they may do (from /api/me). */
+export interface Me {
+  user: Profile;
+  roles: { key: string; name: string }[];
+  permissions: string[];
+  isSuperadmin: boolean;
+}
+
+export interface RoleRef {
+  id: number;
+  key: string;
+  name: string;
+}
+
+export interface AdminUser {
+  id: number;
+  login: string;
+  email: string;
+  titleBefore: string | null;
+  firstName: string;
+  lastName: string;
+  titleAfter: string | null;
+  position: string | null;
+  phone: string | null;
+  landline: string | null;
+  departmentId: number | null;
+  branchId: number | null;
+  status: "active" | "disabled";
+  roles: RoleRef[];
+  hasPhoto: boolean;
+}
+
+export interface AdminRole extends RoleRef {
+  description: string;
+  builtin: boolean;
+  permissions: string[];
+  userCount: number;
+}
+
+export interface ListItem {
+  id: number;
+  name: string;
+  active: boolean;
+}
+
+export interface PermissionGroup {
+  key: string;
+  label: string;
+  permissions: { key: string; label: string }[];
+}
+
+export interface AuditEntry {
+  id: number;
+  at: string;
+  actorLogin: string;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  details: Record<string, unknown>;
+}
+
+export type UserInputBody = {
+  login?: string;
+  email: string;
+  titleBefore: string | null;
+  firstName: string;
+  lastName: string;
+  titleAfter: string | null;
+  position: string | null;
+  phone: string | null;
+  landline: string | null;
+  departmentId: number | null;
+  branchId: number | null;
+  roleIds: number[];
+};
 
 export interface Folder {
   path: string;

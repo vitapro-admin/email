@@ -18,6 +18,8 @@
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
+    "@aquapro/db": "workspace:*",
+    "@aquapro/directory": "workspace:*",
     "@aquapro/editor-schema": "workspace:*",
     "@aquapro/mail-gateway": "workspace:*",
     "@types/nodemailer": "^8.0.2",

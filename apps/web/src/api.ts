@@ -4,8 +4,14 @@ import type {
   Folder,
   MessageSummary,
   MessageView,
-  Profile,
+  Me,
+  AdminRole,
+  AdminUser,
+  AuditEntry,
+  ListItem,
+  PermissionGroup,
   UploadedFile,
+  UserInputBody,
 } from "./types";
 
 export class ApiError extends Error {
@@ -19,7 +25,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(
-  method: "GET" | "POST" | "DELETE",
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE",
   url: string,
   body?: unknown,
 ): Promise<T> {
@@ -82,9 +88,9 @@ export interface OpenedDraft {
 }
 
 export const api = {
-  me: () => request<{ user: Profile }>("GET", "/api/me"),
+  me: () => request<Me>("GET", "/api/me"),
   login: (username: string, password: string) =>
-    request<{ user: Profile }>("POST", "/api/login", { username, password }),
+    request<Me>("POST", "/api/login", { username, password }),
   logout: () => request<{ ok: true }>("POST", "/api/logout", {}),
   folders: () => request<Folder[]>("GET", "/api/folders"),
   messages: (folder: string) =>
@@ -128,4 +134,55 @@ export const api = {
     request<{ removed: boolean }>("DELETE", `/api/drafts?${query({ uid })}`),
   attachmentUrl: (folder: string, uid: number, index: number) =>
     `/api/attachment?${query({ folder, uid, index })}`,
+};
+
+export const photoUrl = (userId: number, version = 0): string =>
+  `/api/users/${userId}/photo?v=${version}`;
+
+export const adminApi = {
+  permissions: () => request<{ groups: PermissionGroup[] }>("GET", "/api/admin/permissions"),
+  users: (filter: { search?: string; status?: string }) =>
+    request<{ users: AdminUser[] }>("GET", `/api/admin/users?${query(filter)}`),
+  createUser: (body: UserInputBody) =>
+    request<{ user: AdminUser }>("POST", "/api/admin/users", body),
+  updateUser: (id: number, body: Partial<UserInputBody>) =>
+    request<{ user: AdminUser }>("PATCH", `/api/admin/users/${id}`, body),
+  setStatus: (id: number, status: "active" | "disabled") =>
+    request<{ user: AdminUser }>("POST", `/api/admin/users/${id}/status`, { status }),
+  setPhoto: async (id: number, file: File): Promise<void> => {
+    const response = await fetch(`/api/admin/users/${id}/photo`, {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "X-AQ-Client": "web", "Content-Type": "application/octet-stream" },
+      body: file,
+    });
+    if (!response.ok) {
+      let message = "Fotografiu sa nepodarilo nahrať.";
+      try {
+        message =
+          ((await response.json()) as { error?: { message?: string } }).error?.message ?? message;
+      } catch {
+        /* keep the generic message */
+      }
+      throw new ApiError(response.status, "photo", message);
+    }
+  },
+  removePhoto: (id: number) => request<{ ok: true }>("DELETE", `/api/admin/users/${id}/photo`),
+  roles: () => request<{ roles: AdminRole[] }>("GET", "/api/admin/roles"),
+  createRole: (body: { name: string; description: string; permissions: string[] }) =>
+    request<{ role: AdminRole }>("POST", "/api/admin/roles", body),
+  updateRole: (id: number, body: { name?: string; description?: string; permissions?: string[] }) =>
+    request<{ role: AdminRole }>("PATCH", `/api/admin/roles/${id}`, body),
+  deleteRole: (id: number) => request<{ ok: true }>("DELETE", `/api/admin/roles/${id}`),
+  items: (kind: "departments" | "branches") =>
+    request<{ items: ListItem[] }>("GET", `/api/lists/${kind}`),
+  createItem: (kind: "departments" | "branches", name: string) =>
+    request<{ item: ListItem }>("POST", `/api/admin/lists/${kind}`, { name }),
+  updateItem: (
+    kind: "departments" | "branches",
+    id: number,
+    body: { name?: string; active?: boolean },
+  ) => request<{ item: ListItem }>("PATCH", `/api/admin/lists/${kind}/${id}`, body),
+  audit: (beforeId?: number) =>
+    request<{ entries: AuditEntry[] }>("GET", `/api/admin/audit?${query({ limit: 50, beforeId })}`),
 };

@@ -4,7 +4,8 @@ import { Compose } from "./Compose";
 import type { ComposeMode } from "./types";
 import { Login } from "./Login";
 import { MailApp } from "./MailApp";
-import type { Profile } from "./types";
+import type { Me } from "./types";
+import { Admin } from "./admin/Admin";
 
 type Theme = "light" | "dark";
 
@@ -36,7 +37,8 @@ function parseComposeHash(
 }
 
 export function App() {
-  const [user, setUser] = useState<Profile | null | "loading">("loading");
+  const [me, setMe] = useState<Me | null | "loading">("loading");
+  const [adminOpen, setAdminOpen] = useState(() => window.location.hash === "#/admin");
   const [theme, setTheme] = useState<Theme>(readTheme);
   const [standalone, setStandalone] = useState(() => parseComposeHash(window.location.hash));
 
@@ -52,21 +54,24 @@ export function App() {
   useEffect(() => {
     api
       .me()
-      .then((r) => setUser(r.user))
+      .then((r) => setMe(r))
       .catch((e: unknown) => {
         if (!(e instanceof ApiError) || e.status !== 401) console.error(e);
-        setUser(null);
+        setMe(null);
       });
   }, []);
 
   useEffect(() => {
-    const onHash = () => setStandalone(parseComposeHash(window.location.hash));
+    const onHash = () => {
+      setStandalone(parseComposeHash(window.location.hash));
+      setAdminOpen(window.location.hash === "#/admin");
+    };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
   }, []);
 
-  if (user === "loading") return <p className="empty">Načítavam…</p>;
-  if (user === null) return <Login onLoggedIn={setUser} />;
+  if (me === "loading") return <p className="empty">Načítavam…</p>;
+  if (me === null) return <Login onLoggedIn={setMe} />;
 
   if (standalone) {
     const done = () => {
@@ -86,14 +91,40 @@ export function App() {
     );
   }
 
+  const canAdmin = me.permissions.some((x) => x === "users:view" || x === "users:manage");
+  const openAdmin = () => {
+    window.location.hash = "#/admin";
+  };
+  const closeAdmin = () => {
+    window.location.hash = "";
+  };
+  const logout = () => {
+    void api.logout().finally(() => {
+      window.location.hash = "";
+      setMe(null);
+    });
+  };
+
   return (
-    <MailApp
-      user={user}
-      theme={theme}
-      onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-      onLogout={() => {
-        void api.logout().finally(() => setUser(null));
-      }}
-    />
+    <>
+      <div hidden={adminOpen && canAdmin} className="app-host">
+        <MailApp
+          user={me.user}
+          theme={theme}
+          onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+          onLogout={logout}
+          {...(canAdmin ? { onOpenAdmin: openAdmin } : {})}
+        />
+      </div>
+      {adminOpen && canAdmin && (
+        <Admin
+          me={me}
+          theme={theme}
+          onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
+          onBack={closeAdmin}
+          onLogout={logout}
+        />
+      )}
+    </>
   );
 }

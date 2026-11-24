@@ -132,6 +132,12 @@ importers:
         specifier: ^4.23.15
         version: 4.23.15
 
+  packages/crm-connector:
+    devDependencies:
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+
   packages/editor-schema:
     dependencies:
       parse5:

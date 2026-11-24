@@ -52,6 +52,8 @@ Zmena rozhodnutia v tabuľke = najprv krátky záznam v `docs/decisions/` a súh
 - Každé volanie AI ide cez `ai-gateway`: zozbieraj minimum kontextu, pseudonymizuj (mená, e-maily, telefóny, IBAN, IČO, DIČ, čísla zmlúv a dokumentov, slovník z CRM), zavolaj AI, doplň späť, zaznamenaj (kto, kedy, aký druh údajov). AI má iba text na vstupe a text na výstupe, žiadne nástroje ani akcie. Text príchodzích e-mailov je nedôveryhodný vstup.
 - AI nikdy neodošle e-mail ani nezapíše do CRM. Vždy schvaľuje človek.
 - Zápis do Actiwhere vždy najprv s `preview: true`, s vlastným `id` operácie proti duplicitám.
+- CRM: vývoj a skúšky len nad testovacím prostredím alebo nad falošným serverom (`pnpm crm:mock`), nikdy nad živými údajmi. Konektor je predvolene len na čítanie, skutočný zápis do živého CRM je zamknutý (`UNLOCK_PRODUCTION_WRITES`), povolený je len `POST /events`. Pozri `docs/decisions/0006-bezpecnost-crm.md`.
+- Do vývoja ani do rozhovoru s AI nepatria reálne osobné údaje z CRM, len vymyslené alebo anonymizované.
 
 ## 6. Štruktúra repozitára
 
@@ -63,7 +65,7 @@ packages/email-render    MJML šablóny, citácia, podpis
 packages/editor-schema   povolená schéma obsahu, čistenie vloženého textu
 packages/mail-sanitize   bezpečné zobrazenie prichádzajúceho HTML (sanitizér, sandbox)
 packages/ai-gateway      anonymizácia, volanie AI, záznam
-packages/crm-connector   Actiwhere API a zrkadlo
+packages/crm-connector   Actiwhere API (s ochranami zápisu), falošný server na vývoj, zrkadlo
 packages/ui              spoločný dizajn AQUA PRO
 infra                    Docker Compose, testovací mailserver, nasadenie
 docs                     dokumentácia a záznamy rozhodnutí

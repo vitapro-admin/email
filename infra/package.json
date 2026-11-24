@@ -1,0 +1,18 @@
+{
+  "name": "@aquapro/infra",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "echo \"infra: no tests\"",
+    "seed": "tsx seed.ts"
+  },
+  "dependencies": {
+    "nodemailer": "^10.6.1"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^8.0.2",
+    "tsx": "^4.23.15"
+  }
+}

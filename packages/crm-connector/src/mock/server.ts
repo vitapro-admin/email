@@ -125,6 +125,10 @@ export interface MockActiwhere {
     /** Every request received: method, path and whether a body was present. */
     requests: { method: string; path: string; hadBody: boolean }[];
     expireAllSessions(): void;
+    /** The mock's own data. Tests may change it to simulate edits made in the CRM. */
+    data: { customers: Obj[]; events: Obj[]; orders: Obj[] };
+    /** Makes GET <endpoint> fail with HTTP 500 from this page on (to test a read that breaks halfway). */
+    failFromPage: { endpoint: string; page: number } | undefined;
   };
 }
 
@@ -180,6 +184,12 @@ export async function createMockActiwhere(options: MockOptions = {}): Promise<Mo
     processedIds: new Set(),
     logins: 0,
     requests: [],
+    data: {
+      customers: structuredClone(customers),
+      events: structuredClone(events),
+      orders: structuredClone(orders),
+    },
+    failFromPage: undefined,
     expireAllSessions: () => {
       expiredEpoch += 1;
       sessions.clear();
@@ -252,8 +262,18 @@ export async function createMockActiwhere(options: MockOptions = {}): Promise<Mo
         send(res, 200, { [key]: data });
       };
 
+      const failing = state.failFromPage;
+      if (
+        method === "GET" &&
+        failing &&
+        failing.endpoint === endpoint &&
+        (typeof paging?.["page"] === "number" ? paging["page"] : 1) >= failing.page
+      ) {
+        return fail(res, 500, "99", "Simulated server error");
+      }
+
       if (method === "GET" && endpoint === "customers") {
-        let rows = customers.filter((c) => {
+        let rows = state.data.customers.filter((c) => {
           if (
             filter["customerId"] !== undefined &&
             filter["customerId"] !== null &&
@@ -284,7 +304,7 @@ export async function createMockActiwhere(options: MockOptions = {}): Promise<Mo
       }
       if (method === "GET" && endpoint === "events") {
         // Documented limitation: the only filter is eventId. Other keys are ignored.
-        const rows = events.filter(
+        const rows = state.data.events.filter(
           (e) =>
             filter["eventId"] === undefined ||
             filter["eventId"] === null ||
@@ -292,7 +312,8 @@ export async function createMockActiwhere(options: MockOptions = {}): Promise<Mo
         );
         return finish("events", page(rows, paging));
       }
-      if (method === "GET" && endpoint === "orders") return finish("orders", page(orders, paging));
+      if (method === "GET" && endpoint === "orders")
+        return finish("orders", page(state.data.orders, paging));
       if (method === "GET" && endpoint === "referenceData") {
         const table =
           typeof filter["tableName"] === "string"

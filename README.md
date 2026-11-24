@@ -31,3 +31,14 @@ pnpm e2e
 ```
 
 Galéria dizajnu e-mailov: `pnpm gallery`.
+
+## Databáza a zrkadlo CRM
+
+`pnpm mail:up` spustí okrem mailservera aj PostgreSQL. Bez skutočného CRM si zrkadlo vyskúšaš s falošným Actiwhere:
+
+```bash
+pnpm mail:up
+pnpm crm:demo        # spustí falošný Actiwhere, skopíruje jeho údaje do databázy a vypíše výsledok
+```
+
+S testovacím CRM (až bude prístup): skopíruj `.env.example` do `.env`, doplň údaje a spusti `pnpm crm:sync`. Pravidlá ochrany živých údajov: `docs/decisions/0006-bezpecnost-crm.md`.

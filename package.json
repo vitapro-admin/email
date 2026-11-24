@@ -16,12 +16,15 @@
     "mail:up": "docker compose -f infra/docker-compose.yml up -d",
     "mail:down": "docker compose -f infra/docker-compose.yml down",
     "mail:seed": "pnpm --filter @aquapro/infra seed",
-    "test:integration": "MAIL_TEST_IMAP_HOST=127.0.0.1 pnpm test",
+    "test:integration": "MAIL_TEST_IMAP_HOST=127.0.0.1 TEST_DATABASE_URL=postgres://aquapro:aquapro-dev@127.0.0.1:5432/aquapro pnpm test",
     "gallery": "pnpm --filter @aquapro/email-render gallery",
     "dev:api": "pnpm --filter @aquapro/api dev",
     "dev:web": "pnpm --filter @aquapro/web dev",
     "e2e": "pnpm --filter @aquapro/web e2e",
-    "crm:mock": "pnpm --filter @aquapro/crm-connector mock"
+    "crm:mock": "pnpm --filter @aquapro/crm-connector mock",
+    "db:migrate": "DATABASE_URL=postgres://aquapro:aquapro-dev@127.0.0.1:5432/aquapro pnpm --filter @aquapro/db migrate",
+    "crm:sync": "pnpm --filter @aquapro/crm-sync sync",
+    "crm:demo": "DATABASE_URL=postgres://aquapro:aquapro-dev@127.0.0.1:5432/aquapro pnpm --filter @aquapro/crm-sync demo"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

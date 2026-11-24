@@ -1,4 +1,4 @@
-# Testovací mailserver pre vývoj (GreenMail). Obsahuje len syntetické dáta, nič nejde von.
+# Vývojové služby: testovací mailserver (GreenMail) a databáza (PostgreSQL). Len syntetické dáta, nič nejde von.
 # Spustenie:  docker compose -f infra/docker-compose.yml up -d
 # Zastavenie: docker compose -f infra/docker-compose.yml down
 services:
@@ -14,3 +14,17 @@ services:
       # Len z tohto počítača (127.0.0.1), nie z celej siete.
       - "127.0.0.1:3025:3025" # SMTP
       - "127.0.0.1:3143:3143" # IMAP
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aquapro
+      POSTGRES_PASSWORD: aquapro-dev
+      POSTGRES_DB: aquapro
+    ports:
+      # Len z tohto počítača. Heslo je vývojové, databáza obsahuje len testovacie údaje.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - aquapro-pgdata:/var/lib/postgresql/data
+
+volumes:
+  aquapro-pgdata:
